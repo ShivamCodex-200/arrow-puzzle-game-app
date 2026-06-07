@@ -1,8 +1,8 @@
-import { create } from 'zustand';
-import { generateLevel } from '../engine/generateLevel';
-import { canEscape } from '../engine/canEscape';
-import { escapeArrow, checkWin, isDeadlock } from '../engine/escapeArrow';
-import type { GridState } from '../engine/types';
+import { create } from "zustand";
+import { canEscape } from "../engine/canEscape";
+import { checkWin, escapeArrow, isDeadlock } from "../engine/escapeArrow";
+import { generateLevel } from "../engine/generateLevel";
+import type { GridState } from "../engine/types";
 
 interface GameStore {
   grid: GridState | null;
@@ -25,27 +25,27 @@ interface GameStore {
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  grid:          null,
-  initialGrid:   null,
-  moves:         0,
-  isWon:         false,
-  isDeadlocked:  false,
-  history:       [],
-  hints:         3,
-  hintCellIds:   [],
+  grid: null,
+  initialGrid: null,
+  moves: 0,
+  isWon: false,
+  isDeadlocked: false,
+  history: [],
+  hints: 3,
+  hintCellIds: [],
 
   // ── Load level ────────────────────────────────────────────────────────────
   loadLevel: (level: number) => {
-    const lvl  = Math.max(1, Math.floor(level));
+    const lvl = Math.max(1, Math.floor(level));
     const grid = generateLevel(lvl);
     set({
       grid,
-      initialGrid:  grid,
-      moves:        0,
-      isWon:        false,
+      initialGrid: grid,
+      moves: 0,
+      isWon: false,
       isDeadlocked: false,
-      history:      [],
-      hintCellIds:  [],
+      history: [],
+      hintCellIds: [],
     });
   },
 
@@ -54,7 +54,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = get();
     if (!state.grid || state.isWon || state.isDeadlocked) return false;
 
-    const arrow = state.grid.arrows.find(a => a.id === arrowId);
+    const arrow = state.grid.arrows.find((a) => a.id === arrowId);
     if (!arrow || arrow.isRemoved) return false;
 
     if (!canEscape(state.grid, arrowId)) return false;
@@ -62,27 +62,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Save current state to history before escape mutation
     const currentGridCopy = JSON.parse(JSON.stringify(state.grid)) as GridState;
 
-    const newGrid    = escapeArrow(state.grid, arrowId);
-    const won        = checkWin(newGrid);
+    const newGrid = escapeArrow(state.grid, arrowId);
+    const won = checkWin(newGrid);
     const deadlocked = !won && isDeadlock(newGrid);
 
     set({
-      grid:         newGrid,
-      moves:        state.moves + 1,
-      isWon:        won,
+      grid: newGrid,
+      moves: state.moves + 1,
+      isWon: won,
       isDeadlocked: deadlocked,
-      history:      [...state.history.slice(-9), currentGridCopy],
-      hintCellIds:  [],
+      history: [...state.history.slice(-9), currentGridCopy],
+      hintCellIds: [],
     });
 
     if (won) {
       // Report to progress store lazily (avoids circular import)
       try {
-        const { useProgressStore } = require('../store/useProgressStore');
-        const total  = newGrid.totalArrows;
+        const { useProgressStore } = require("../store/useProgressStore");
+        const total = newGrid.totalArrows;
         const movesUsed = state.moves + 1;
-        const stars  = movesUsed <= total ? 3 : movesUsed <= Math.floor(total * 1.5) ? 2 : 1;
-        useProgressStore.getState().completeLevel(state.grid.levelNumber, stars);
+        const stars =
+          movesUsed <= total ? 3 : movesUsed <= Math.floor(total * 1.5) ? 2 : 1;
+        useProgressStore
+          .getState()
+          .completeLevel(state.grid.levelNumber, stars);
       } catch (_) {}
     }
 
@@ -95,7 +98,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { grid } = get();
     if (!grid) return;
 
-    const newArrows = grid.arrows.filter(a => a.id !== arrowId);
+    const newArrows = grid.arrows.filter((a) => a.id !== arrowId);
     set({
       grid: {
         ...grid,
@@ -110,12 +113,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (history.length === 0) return;
     const prev = history[history.length - 1];
     set({
-      grid:         prev,
-      history:      history.slice(0, -1),
-      moves:        Math.max(0, moves - 1),
-      isWon:        false,
+      grid: prev,
+      history: history.slice(0, -1),
+      moves: Math.max(0, moves - 1),
+      isWon: false,
       isDeadlocked: false,
-      hintCellIds:  [],
+      hintCellIds: [],
     });
   },
 
@@ -145,12 +148,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { initialGrid } = get();
     if (!initialGrid) return;
     set({
-      grid:         initialGrid,
-      moves:        0,
-      isWon:        false,
+      grid: initialGrid,
+      moves: 0,
+      isWon: false,
       isDeadlocked: false,
-      history:      [],
-      hintCellIds:  [],
+      history: [],
+      hintCellIds: [],
     });
   },
 
@@ -161,13 +164,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const nextLvl = grid.levelNumber + 1;
     const newGrid = generateLevel(nextLvl);
     set({
-      grid:         newGrid,
-      initialGrid:  newGrid,
-      moves:        0,
-      isWon:        false,
+      grid: newGrid,
+      initialGrid: newGrid,
+      moves: 0,
+      isWon: false,
       isDeadlocked: false,
-      history:      [],
-      hintCellIds:  [],
+      history: [],
+      hintCellIds: [],
     });
   },
 }));

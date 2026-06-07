@@ -1,13 +1,13 @@
-import type { GridState } from './types';
-import { canEscape } from './canEscape';
+import { canEscape } from "./canEscape";
+import type { GridState } from "./types";
 
 /**
  * Returns a new GridState with the arrow marked as isRemoved: true.
  * Does not mutate the original.
  */
 export function escapeArrow(grid: GridState, arrowId: string): GridState {
-  const newArrows = grid.arrows.map(a =>
-    a.id === arrowId ? { ...a, isRemoved: true } : a
+  const newArrows = grid.arrows.map((a) =>
+    a.id === arrowId ? { ...a, isRemoved: true } : a,
   );
 
   return {

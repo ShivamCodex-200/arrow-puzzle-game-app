@@ -1,14 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useGameStore } from '../../store/useGameStore';
-import { GameHeader } from '../../components/GameHeader';
-import { GameGrid } from '../../components/GameGrid';
-import { HintButton } from '../../components/HintButton';
-import { WinOverlay } from '../../components/WinOverlay';
-import { COLORS } from '../../constants/theme';
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef } from "react";
+import { StatusBar, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { GameGrid } from "../../components/GameGrid";
+import { GameHeader } from "../../components/GameHeader";
+import { HintButton } from "../../components/HintButton";
+import { WinOverlay } from "../../components/WinOverlay";
+import { COLORS } from "../../constants/theme";
+import { useGameStore } from "../../store/useGameStore";
 
 export default function PlayScreen() {
   const params = useLocalSearchParams<{ level?: string }>();
@@ -19,7 +19,7 @@ export default function PlayScreen() {
   useEffect(() => {
     // Parse level safely — fall back to 1 if param is missing or invalid
     const raw = Array.isArray(params.level) ? params.level[0] : params.level;
-    const lvl = Math.max(1, parseInt(raw ?? '1', 10) || 1);
+    const lvl = Math.max(1, parseInt(raw ?? "1", 10) || 1);
 
     if (loadedRef.current !== lvl) {
       loadedRef.current = lvl;
@@ -35,7 +35,12 @@ export default function PlayScreen() {
       <StatusBar barStyle="dark-content" />
 
       {/* Safe area padding manually so gradient fills full screen */}
-      <View style={[styles.inner, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View
+        style={[
+          styles.inner,
+          { paddingTop: insets.top, paddingBottom: insets.bottom },
+        ]}
+      >
         {grid ? (
           <>
             <GameHeader />

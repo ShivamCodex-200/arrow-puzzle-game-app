@@ -10,6 +10,8 @@ const DIFF_COLOR: Record<string, string> = {
   Easy:   '#22C55E',
   Normal: '#F59E0B',
   Hard:   '#EF4444',
+  Expert: '#8B5CF6',
+  Master: '#EC4899',
 };
 
 export const GameHeader: React.FC = () => {
@@ -19,8 +21,8 @@ export const GameHeader: React.FC = () => {
   if (!grid) return null;
 
   const level      = grid.levelNumber;
-  const diff       = getDifficulty(level);
-  const diffColor  = DIFF_COLOR[diff];
+  const diff       = grid.difficulty || getDifficulty(level);
+  const diffColor  = DIFF_COLOR[diff] || '#64748B';
   const canUndo    = history.length > 0;
 
   return (

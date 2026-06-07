@@ -1,4 +1,4 @@
-import type { Arrow, GridState, Point } from './types';
+import type { Arrow, GridState, Point } from "./types";
 
 /**
  * Returns all grid cells occupied by the given arrow.
@@ -15,7 +15,7 @@ export function getOccupiedCells(arrow: Arrow): Point[] {
  * Therefore, we only need to check if the exit path from the head (final cell) to the board edge is clear.
  */
 export function canEscape(grid: GridState, arrowId: string): boolean {
-  const arrow = grid.arrows.find(a => a.id === arrowId);
+  const arrow = grid.arrows.find((a) => a.id === arrowId);
   if (!arrow || arrow.isRemoved) return false;
 
   // 1. Gather all cells occupied by OTHER active arrows
@@ -35,9 +35,9 @@ export function canEscape(grid: GridState, arrowId: string): boolean {
   let cy = head.y;
 
   while (true) {
-    if (dir === 'right') cx++;
-    else if (dir === 'left') cx--;
-    else if (dir === 'down') cy++;
+    if (dir === "right") cx++;
+    else if (dir === "left") cx--;
+    else if (dir === "down") cy++;
     else cy--;
 
     // Reached the edge of the board

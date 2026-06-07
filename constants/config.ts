@@ -1,20 +1,20 @@
-import { getGridSize } from '../engine/generateLevel';
+import { getGridSize } from "../engine/generateLevel";
 
-export const GRID_PADDING = 24;      // horizontal padding on each side
-export const CELL_GAP = 6;          // gap between cells
-export const MAX_LEVELS_VISIBLE = 200;
+export const GRID_PADDING = 24; // horizontal padding fallback
+export const CELL_GAP = 2; // gap between cells (reduced for density)
 
 export function getCellSize(screenWidth: number, cols: number): number {
-  // Cell size = (available width - gaps between cells) / cols
-  const available = screenWidth - GRID_PADDING * 2;
+  // Core board width is 70% of screenWidth (total width ~80% with padding)
+  const targetBoardWidth = screenWidth * 0.7;
   const totalGap = CELL_GAP * (cols - 1);
-  return Math.floor((available - totalGap) / cols);
+  return Math.floor((targetBoardWidth - totalGap) / cols);
 }
 
-export function getDifficulty(level: number): 'Easy' | 'Normal' | 'Hard' {
-  if (level <= 10) return 'Easy';
-  if (level <= 50) return 'Normal';
-  return 'Hard';
+export function getDifficulty(level: number): "Easy" | "Normal" | "Hard" {
+  if (level <= 10) return "Easy";
+  if (level <= 50) return "Normal";
+  return "Hard";
 }
 
 export { getGridSize };
+

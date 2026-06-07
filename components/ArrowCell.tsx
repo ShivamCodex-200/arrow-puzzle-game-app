@@ -1,18 +1,18 @@
-import React, { useEffect, useRef } from 'react';
-import { Pressable, View, StyleSheet } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import React, { useEffect, useRef } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  useAnimatedProps,
-  withTiming,
-  withSequence,
   Easing,
   runOnJS,
-} from 'react-native-reanimated';
-import type { Arrow, Direction, Point } from '../engine/types';
-import { getOccupiedCells } from '../engine/canEscape';
-import { COLORS } from '../constants/theme';
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
+import { COLORS } from "../constants/theme";
+import { getOccupiedCells } from "../engine/canEscape";
+import type { Arrow, Point } from "../engine/types";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -50,7 +50,7 @@ export const ArrowCell: React.FC<Props> = ({
   const prevIdRef = useRef<string | undefined>(undefined);
 
   // ── 1. Calculate the full coordinate path (including exit extension) ─────
-  const basePixels = arrow.cells.map(cell => ({
+  const basePixels = arrow.cells.map((cell) => ({
     x: cell.x * (cellSize + cellGap) + cellSize / 2 + padding,
     y: cell.y * (cellSize + cellGap) + cellSize / 2 + padding,
   }));
@@ -64,9 +64,9 @@ export const ArrowCell: React.FC<Props> = ({
   for (let i = 1; i <= arrow.cells.length + 2; i++) {
     let px = headPixel.x;
     let py = headPixel.y;
-    if (dir === 'right') px += i * stepDist;
-    else if (dir === 'left') px -= i * stepDist;
-    else if (dir === 'down') py += i * stepDist;
+    if (dir === "right") px += i * stepDist;
+    else if (dir === "left") px -= i * stepDist;
+    else if (dir === "down") py += i * stepDist;
     else py -= i * stepDist;
     fullPoints.push({ x: px, y: py });
   }
@@ -94,7 +94,7 @@ export const ArrowCell: React.FC<Props> = ({
           if (finished) {
             runOnJS(onEscapeComplete)();
           }
-        }
+        },
       );
     }
   }, [arrow.isRemoved]);
@@ -111,19 +111,19 @@ export const ArrowCell: React.FC<Props> = ({
           if (finished) {
             runOnJS(onShakeDone)();
           }
-        })
+        }),
       );
     }
   }, [triggerShake]);
 
   // ── Animated Props for SVG Path ──────────────────────────────────────────
   const animatedStemProps = useAnimatedProps(() => {
-    'worklet';
+    "worklet";
     const p = progress.value;
     const len = basePixels.length;
 
     if (p >= len) {
-      return { d: 'M 0 0' };
+      return { d: "M 0 0" };
     }
 
     const t_start = p;
@@ -160,12 +160,12 @@ export const ArrowCell: React.FC<Props> = ({
   });
 
   const animatedHeadProps = useAnimatedProps(() => {
-    'worklet';
+    "worklet";
     const p = progress.value;
     const len = basePixels.length;
 
     if (p >= len) {
-      return { d: 'M 0 0' };
+      return { d: "M 0 0" };
     }
 
     const t_end = len - 1 + p;
@@ -182,16 +182,16 @@ export const ArrowCell: React.FC<Props> = ({
     };
 
     const ptEnd = getPoint(t_end);
-    const headSize = 14;
+    const headSize = 7;
 
-    let headD = '';
-    if (dir === 'right') {
+    let headD = "";
+    if (dir === "right") {
       headD = `M ${ptEnd.x - headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x - headSize} ${ptEnd.y + headSize}`;
-    } else if (dir === 'left') {
+    } else if (dir === "left") {
       headD = `M ${ptEnd.x + headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y + headSize}`;
-    } else if (dir === 'up') {
+    } else if (dir === "up") {
       headD = `M ${ptEnd.x - headSize} ${ptEnd.y + headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y + headSize}`;
-    } else if (dir === 'down') {
+    } else if (dir === "down") {
       headD = `M ${ptEnd.x - headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y - headSize}`;
     }
 
@@ -209,13 +209,21 @@ export const ArrowCell: React.FC<Props> = ({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* Visual rendering layer clipped to the grid canvas boundary */}
-      <Animated.View style={[StyleSheet.absoluteFill, shakeStyle]} pointerEvents="none">
-        <Svg width={svgWidth} height={svgHeight} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Animated.View
+        style={[StyleSheet.absoluteFill, shakeStyle]}
+        pointerEvents="none"
+      >
+        <Svg
+          width={svgWidth}
+          height={svgHeight}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        >
           {/* Animated Stem */}
           <AnimatedPath
             animatedProps={animatedStemProps}
             stroke={strokeColor}
-            strokeWidth={10}
+            strokeWidth={6}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
@@ -224,7 +232,7 @@ export const ArrowCell: React.FC<Props> = ({
           <AnimatedPath
             animatedProps={animatedHeadProps}
             stroke={strokeColor}
-            strokeWidth={10}
+            strokeWidth={6}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
@@ -260,7 +268,7 @@ export const ArrowCell: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   tapCell: {
-    position: 'absolute',
-    backgroundColor: 'transparent',
+    position: "absolute",
+    backgroundColor: "transparent",
   },
 });
