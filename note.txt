@@ -1,0 +1,197 @@
+bro look what the fuck have you  created this is not even 1% of the actual arrow puzzle game . The second screenshot of our game and first is from actual game screenshot .Bro I have to build Arrow puzzle game 
+
+Build a complete Arrow Puzzle mobile game in React Native with Expo (using Expo Router, NativeWind for styling, Zustand for state, and React Native Reanimated for animations).
+
+
+
+GAME MECHANICS (Read very carefully — this is NOT a rotation game)
+Core concept: A grid (e.g. 4x4, 5x5, 6x6) filled with arrows. Each arrow points in one of 4 directions: UP, DOWN, LEFT, RIGHT. The player taps an arrow to make it "escape" the board by flying in the direction it points. An arrow can ONLY escape if its entire path to the edge of the grid is completely CLEAR (no other arrows blocking it). Tapping a blocked arrow does nothing (or shows a shake/error animation). Successfully removing one arrow opens paths for others. The goal is to clear ALL arrows from the board. This is a sequential logic puzzle — order matters.
+
+TYPES — src/engine/types.ts
+tsexport type Direction = 'up' | 'down' | 'left' | 'right';
+
+export interface Arrow {
+  id: string;
+  row: number;
+  col: number;
+  direction: Direction;
+  isRemoved: boolean;
+}
+
+export interface GridState {
+  rows: number;
+  cols: number;
+  arrows: Arrow[][];   // null means empty cell
+  levelNumber: number;
+  totalArrows: number;
+  removedCount: number;
+}
+
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+CORE ENGINE — src/engine/
+canEscape(grid: GridState, row: number, col: number): boolean
+Check if the arrow at (row, col) has a clear path to the board edge in its pointing direction. Iterate every cell between the arrow and the edge — if ANY cell contains a non-removed arrow, return false. Return true only if the full path is empty.
+Example: Arrow at row=2, col=1 pointing RIGHT → check col=2, col=3, col=4... all the way to the right edge. If all empty → can escape.
+escapeArrow(grid: GridState, row: number, col: number): GridState
+Returns a new grid state with that arrow marked as removed (isRemoved: true, treat as empty cell).
+checkWin(grid: GridState): boolean
+Return true if removedCount === totalArrows (all arrows cleared).
+isDeadlock(grid: GridState): boolean
+Return true if NO remaining arrow can escape (all paths blocked) — triggers a "no moves" state.
+generateLevel(levelNumber: number): GridState
+Use seeded random generation (seed = levelNumber). Generate by REVERSE engineering: start with empty grid, place arrows in a valid removal ORDER (so the puzzle is guaranteed solvable). Grid size increases with level: levels 1-10 → 4x4, 11-30 → 5x5, 31-70 → 6x6, 71-150 → 7x7, 150+ → 8x8. Some cells can be intentionally left empty (dots) for visual spacing.
+
+ZUSTAND STORE — src/store/useGameStore.ts
+tsinterface GameStore {
+  grid: GridState | null;
+  moves: number;
+  isWon: boolean;
+  isDeadlocked: boolean;
+  history: GridState[];   // for undo
+  hints: number;
+
+  loadLevel: (level: number) => void;
+  tapArrow: (row: number, col: number) => void;  // only works if canEscape
+  undoMove: () => void;
+  useHint: () => void;    // highlights one escapable arrow
+  resetLevel: () => void;
+  nextLevel: () => void;
+}
+
+ANIMATION — Critical for game feel
+When an arrow is tapped and CAN escape:
+
+It slides/flies in its direction using withTiming (duration: 300ms) — translate X or Y by 400px (off screen)
+It fades out simultaneously with withTiming opacity 0
+The cell becomes empty (show a subtle dot like in the original game)
+Trigger Haptics.impactAsync(ImpactFeedbackStyle.Light)
+
+When an arrow is tapped but CANNOT escape (blocked):
+
+Play a short shake animation left-right using withSequence
+Trigger Haptics.notificationAsync(NotificationFeedbackType.Warning)
+
+When all arrows cleared (WIN):
+
+Show a big celebration animation (Lottie confetti)
+Show win overlay with stars, next level button
+Trigger Haptics.notificationAsync(NotificationFeedbackType.Success)
+
+
+COMPONENTS
+GameGrid.tsx
+
+Renders a grid using rows of Views
+Cell size = (screenWidth - 48) / cols — always responsive
+Empty cells show a small dot (like the original)
+Wrap each cell in Animated.View from Reanimated
+
+ArrowCell.tsx
+
+Shows arrow icon using SVG or a Unicode arrow character styled with Text
+Color: escapable arrows glow/highlight (e.g. cyan/blue tint) vs blocked arrows (normal dark color)
+Use useAnimatedStyle for slide-out and shake animations
+Pressable wrapping for tap detection
+
+GameHeader.tsx
+
+Left: back button
+Center: "Level {n}" with difficulty badge (Easy/Normal/Hard)
+Right: settings icon
+Below: moves counter on left, reset button on right
+
+WinOverlay.tsx
+
+Full screen overlay with blur background
+Stars (1-3 based on moves used)
+"Next Level" button → router.push with next level number
+"Replay" button → resetLevel()
+
+HintSystem
+
+Hint button at bottom with count badge
+When used: briefly pulses/highlights all currently-escapable arrows in green
+Costs 1 hint, player starts with 3
+
+
+SCREENS (Expo Router file-based)
+app/
+  _layout.tsx          ← Root layout, load fonts, providers
+  index.tsx            ← redirect to /(game)/home
+  (game)/
+    _layout.tsx        ← headerShown: false
+    home.tsx           ← Main menu: Play, Settings, About
+    levels.tsx         ← Level select grid (locked/unlocked/stars)
+    play.tsx           ← Game screen: receives ?level=N param
+    win.tsx            ← Optional win screen OR use overlay
+    settings.tsx       ← Sound, haptics, theme toggles
+
+FOLDER STRUCTURE
+src/
+  engine/
+    types.ts
+    canEscape.ts
+    generateLevel.ts
+    winChecker.ts
+    deadlockChecker.ts
+  store/
+    useGameStore.ts
+    useProgressStore.ts   ← completed levels, stars, hints balance
+    useSettingsStore.ts   ← sound, haptics on/off
+  components/
+    game/
+      GameGrid.tsx
+      ArrowCell.tsx
+      GameHeader.tsx
+      WinOverlay.tsx
+      HintButton.tsx
+    ui/
+      Button.tsx
+      Modal.tsx
+      LevelCard.tsx
+  hooks/
+    useGameLogic.ts    ← ties store + engine + animations together
+    useHaptics.ts
+    useSound.ts
+  constants/
+    theme.ts
+    config.ts          ← grid sizes per level range
+
+VISUAL STYLE (match the original game)
+
+Background: Light blue-grey gradient (#E8EEF4 to #D0DCE8)
+Arrow cells: White/light cards with rounded corners, dark navy arrows (#1a2340)
+Empty cells: Show a small grey dot (3-4px) centered
+Arrow style: Bold, thick arrows — use SVG paths or a custom ArrowIcon component, NOT emoji
+Bottom bar: White pill-shaped container with hint (lightbulb) and eraser buttons, both with count badges
+Font: Clean sans-serif, Inter or System default
+NO cell borders/grid lines — just floating cards on the gradient background
+
+
+LEVEL GENERATION ALGORITHM (seed-based, guaranteed solvable)
+1. Start with empty grid of size NxN
+2. Create a random removal ORDER using seeded random (seed = levelNumber)
+3. For each position in removal order:
+   a. Place an arrow pointing toward the nearest empty edge path
+   b. The direction must be valid given what's already placed
+4. Scramble arrow directions slightly while maintaining solvability
+5. Result: a grid where following the correct tap sequence clears all arrows
+
+PACKAGES TO INSTALL
+bashnpx expo install expo-haptics expo-linear-gradient
+npm install zustand react-native-reanimated react-native-gesture-handler lottie-react-native
+npm install react-native-svg
+
+IMPORTANT RULES FOR THE AGENT
+
+DO NOT build a rotation game — arrows do NOT rotate on tap. They ESCAPE/FLY OFF the board.
+DO NOT use emoji for arrows — use SVG or custom drawn arrow components.
+ALWAYS validate solvability — generated levels must be clearable.
+ALWAYS use useSharedValue and useAnimatedStyle from Reanimated — never Animated from React Native core.
+ALWAYS calculate cell size dynamically from screen width — never hardcode pixel values.
+ALWAYS separate pure engine logic (no React) from UI components.
+Empty cells must be visually distinct (dot) from filled cells.
+The canEscape check must run in real-time — highlight escapable arrows subtly.
+
+

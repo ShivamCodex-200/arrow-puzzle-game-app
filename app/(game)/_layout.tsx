@@ -1,0 +1,12 @@
+import { Stack } from 'expo-router';
+
+export default function GameLayout() {
+  return (
+    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Screen name="home" />
+      <Stack.Screen name="levels" />
+      <Stack.Screen name="play" />
+      <Stack.Screen name="settings" />
+    </Stack>
+  );
+}
