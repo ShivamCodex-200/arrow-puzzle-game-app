@@ -10,6 +10,8 @@ interface GameStore {
   moves: number;
   isWon: boolean;
   isDeadlocked: boolean;
+  lives: number;
+  isGameOver: boolean;
   history: GridState[];
   hints: number;
   hintCellIds: string[];
@@ -30,6 +32,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   moves: 0,
   isWon: false,
   isDeadlocked: false,
+  lives: 3,
+  isGameOver: false,
   history: [],
   hints: 3,
   hintCellIds: [],
@@ -44,6 +48,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: 0,
       isWon: false,
       isDeadlocked: false,
+      lives: 3,
+      isGameOver: false,
       history: [],
       hintCellIds: [],
     });
@@ -52,12 +58,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Tap arrow → returns true if escapes, false if blocked ─────────────────
   tapArrow: (arrowId: string) => {
     const state = get();
-    if (!state.grid || state.isWon || state.isDeadlocked) return false;
+    if (!state.grid || state.isWon || state.isDeadlocked || state.isGameOver) return false;
 
     const arrow = state.grid.arrows.find((a) => a.id === arrowId);
     if (!arrow || arrow.isRemoved) return false;
 
-    if (!canEscape(state.grid, arrowId)) return false;
+    if (!canEscape(state.grid, arrowId)) {
+      // Tap blocked arrow -> lose a life
+      const newLives = Math.max(0, state.lives - 1);
+      set({
+        lives: newLives,
+        isGameOver: newLives === 0,
+      });
+      return false;
+    }
 
     // Save current state to history before escape mutation
     const currentGridCopy = JSON.parse(JSON.stringify(state.grid)) as GridState;
@@ -152,6 +166,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: 0,
       isWon: false,
       isDeadlocked: false,
+      lives: 3,
+      isGameOver: false,
       history: [],
       hintCellIds: [],
     });
@@ -169,6 +185,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: 0,
       isWon: false,
       isDeadlocked: false,
+      lives: 3,
+      isGameOver: false,
       history: [],
       hintCellIds: [],
     });

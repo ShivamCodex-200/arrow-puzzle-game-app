@@ -16,7 +16,7 @@ const DIFF_COLOR: Record<string, string> = {
 
 export const GameHeader: React.FC = () => {
   const router = useRouter();
-  const { grid, moves, resetLevel, undoMove, history } = useGameStore();
+  const { grid, moves, resetLevel, undoMove, history, lives } = useGameStore();
 
   if (!grid) return null;
 
@@ -41,6 +41,19 @@ export const GameHeader: React.FC = () => {
           <Text style={styles.levelText}>Level {level}</Text>
           <View style={[styles.diffBadge, { backgroundColor: diffColor + '22' }]}>
             <Text style={[styles.diffText, { color: diffColor }]}>{diff}</Text>
+          </View>
+          
+          {/* Hearts Display */}
+          <View style={styles.heartsRow}>
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <MaterialIcons
+                key={idx}
+                name={idx < lives ? "favorite" : "favorite-border"}
+                size={18}
+                color={idx < lives ? "#EF4444" : "#D1D5DB"}
+                style={styles.heartIcon}
+              />
+            ))}
           </View>
         </View>
 
@@ -124,6 +137,16 @@ const styles = StyleSheet.create({
     fontSize:   11,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  heartsRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    justifyContent: 'center',
+    marginTop:     2,
+    gap:           6,
+  },
+  heartIcon: {
+    marginHorizontal: 1,
   },
   bottomRow: {
     flexDirection:  'row',

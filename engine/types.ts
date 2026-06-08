@@ -7,7 +7,8 @@ export type ShapeType =
   | "cross"
   | "spiral"
   | "donut"
-  | "hex";
+  | "hex"
+  | "heart";
 
 export interface Point {
   x: number; // column index (0 to cols-1)

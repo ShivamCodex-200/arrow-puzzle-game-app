@@ -7,6 +7,7 @@ import { GameGrid } from "../../components/GameGrid";
 import { GameHeader } from "../../components/GameHeader";
 import { HintButton } from "../../components/HintButton";
 import { WinOverlay } from "../../components/WinOverlay";
+import { GameOverOverlay } from "../../components/GameOverOverlay";
 import { COLORS } from "../../constants/theme";
 import { useGameStore } from "../../store/useGameStore";
 
@@ -55,6 +56,9 @@ export default function PlayScreen() {
 
       {/* Win overlay sits above everything */}
       <WinOverlay />
+
+      {/* Game Over overlay sits above everything */}
+      <GameOverOverlay />
     </LinearGradient>
   );
 }

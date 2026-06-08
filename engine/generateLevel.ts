@@ -11,13 +11,123 @@ function mulberry32(seed: number) {
   };
 }
 
-// Deterministic Grid progression mapped by level number
+// Sizing logic that assigns dynamic, randomized, and screen-ratio friendly sizes per level
+function getGridSizeForSeed(level: number): { rows: number; cols: number } {
+  const shape = getShapeForLevel(level);
+
+  // If it's a shape level, we want a square grid to avoid shape distortion
+  if (shape !== "rectangle") {
+    let size = 12;
+    if (level <= 10) size = 12;
+    else if (level <= 30) size = 14;
+    else if (level <= 70) size = 16;
+    else size = 18;
+    return { rows: size, cols: size };
+  }
+
+  // Use a deterministic seed to make sizes stable per level number
+  const levelSeed = level * 1618033988 + 9973;
+  const rand = mulberry32(levelSeed);
+
+  let minCols = 7;
+  let maxCols = 9;
+  let minDiff = 3;
+  let maxDiff = 5;
+
+  if (level <= 10) {
+    minCols = 7;
+    maxCols = 9;
+    minDiff = 3;
+    maxDiff = 5;
+  } else if (level <= 30) {
+    minCols = 9;
+    maxCols = 11;
+    minDiff = 4;
+    maxDiff = 6;
+  } else if (level <= 70) {
+    minCols = 11;
+    maxCols = 13;
+    minDiff = 4;
+    maxDiff = 7;
+  } else if (level <= 150) {
+    minCols = 12;
+    maxCols = 14;
+    minDiff = 5;
+    maxDiff = 8;
+  } else {
+    minCols = 13;
+    maxCols = 15;
+    minDiff = 6;
+    maxDiff = 9;
+  }
+
+  const cols = minCols + Math.floor(rand() * (maxCols - minCols + 1));
+  const diff = minDiff + Math.floor(rand() * (maxDiff - minDiff + 1));
+  const rows = cols + diff;
+
+  return { rows, cols };
+}
+
 export function getGridSize(level: number): { rows: number; cols: number } {
-  if (level <= 20) return { rows: 10, cols: 10 };
-  if (level <= 50) return { rows: 12, cols: 12 };
-  if (level <= 100) return { rows: 14, cols: 14 };
-  if (level <= 300) return { rows: 16, cols: 16 };
-  return { rows: 18, cols: 18 };
+  const size = getGridSizeForSeed(level);
+  if (level <= 4) return size;
+
+  const s1 = getGridSizeForSeed(level - 1);
+  const s2 = getGridSizeForSeed(level - 2);
+  const s3 = getGridSizeForSeed(level - 3);
+
+  // Avoid more than 3 consecutive levels with the exact same dimensions
+  if (
+    size.rows === s1.rows && size.cols === s1.cols &&
+    s1.rows === s2.rows && s1.cols === s2.cols &&
+    s2.rows === s3.rows && s2.cols === s3.cols
+  ) {
+    const levelSeed = level * 1618033988 + 9973;
+    const rand = mulberry32(levelSeed);
+    const perturbRows = rand() < 0.5;
+    if (perturbRows) {
+      const change = rand() < 0.5 ? 1 : -1;
+      const newRows = size.rows + change;
+      if (newRows > size.cols + 1) {
+        return { rows: newRows, cols: size.cols };
+      }
+    }
+    const change = rand() < 0.5 ? 1 : -1;
+    const newCols = size.cols + change;
+    if (size.rows > newCols + 1) {
+      return { rows: size.rows, cols: newCols };
+    }
+  }
+
+  return size;
+}
+
+// Determines the shape category for a given level
+export function getShapeForLevel(level: number): ShapeType {
+  // Shape milestones (high achievements)
+  if (level === 100) return "diamond";
+  if (level === 250) return "circle";
+  if (level === 500) return "cross";
+  if (level === 1000) return "spiral";
+
+  // Level 6 is heart shape as shown in screenshot
+  if (level === 6) return "heart";
+
+  // A shape level occurs every 12 to 15 levels deterministically
+  const shapeLevels = [6, 18, 32, 45, 58, 72, 85, 115, 128, 142, 155, 168, 182, 195, 208, 222, 235, 248, 262, 275, 288];
+  
+  let isShape = shapeLevels.includes(level);
+  if (level > 300) {
+    isShape = (level - 301) % 13 === 0;
+  }
+
+  if (!isShape) return "rectangle";
+
+  // Select a non-rectangle shape deterministically based on level seed
+  const shapes: ShapeType[] = ["heart", "circle", "diamond", "cross", "spiral", "donut", "hex"];
+  const levelSeed = level * 1618033988 + 9973;
+  const rand = mulberry32(levelSeed);
+  return shapes[Math.floor(rand() * shapes.length)];
 }
 
 // Multi-dimension and Shape progression
@@ -25,20 +135,8 @@ function getGridSizeAndShape(
   level: number,
   rand: () => number
 ): { rows: number; cols: number; shape: ShapeType } {
+  const shape = getShapeForLevel(level);
   const { rows, cols } = getGridSize(level);
-  let shape: ShapeType = "rectangle";
-
-  // Achievement shape milestones (5% of levels)
-  if (level === 100) {
-    shape = "diamond";
-  } else if (level === 250) {
-    shape = "circle";
-  } else if (level === 500) {
-    shape = "cross";
-  } else if (level === 1000) {
-    shape = "spiral";
-  }
-
   return { rows, cols, shape };
 }
 
@@ -84,6 +182,14 @@ function getShapeMask(shape: ShapeType, rows: number, cols: number): boolean[][]
 
         case "hex":
           active = Math.abs(y) <= 0.95 && Math.abs(x) + Math.abs(y) / 2 <= 0.95;
+          break;
+
+        case "heart":
+          // Heart shape algebraic formula
+          const hx = cols > 1 ? (c - (cols - 1) / 2) / ((cols - 1) / 2) * 1.3 : 0;
+          const hy = rows > 1 ? -((r - (rows - 1) / 2) / ((rows - 1) / 2) * 1.2 - 0.15) : 0;
+          const hVal = Math.pow(hx * hx + hy * hy - 0.95, 3) - hx * hx * Math.pow(hy, 3);
+          active = hVal <= 0;
           break;
 
         default:
@@ -160,14 +266,16 @@ function cleanupMaskComponents(mask: boolean[][], rows: number, cols: number) {
 function findPathBacktracking(
   start: Point,
   targetLength: number,
-  occupied: Set<string>,
+  occupied: Uint8Array,
   shapeMask: boolean[][],
   rows: number,
   cols: number,
-  rand: () => number
+  rand: () => number,
+  pathVisited: Uint8Array
 ): Point[] | null {
   const path: Point[] = [start];
-  const visited = new Set<string>([`${start.x},${start.y}`]);
+  pathVisited.fill(0);
+  pathVisited[start.y * cols + start.x] = 1;
 
   function dfs(curr: Point): boolean {
     if (path.length === targetLength) {
@@ -187,8 +295,8 @@ function findPathBacktracking(
       const ny = curr.y + d.dy;
       if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
         if (shapeMask[ny][nx]) {
-          const key = `${nx},${ny}`;
-          if (!occupied.has(key) && !visited.has(key)) {
+          const idx = ny * cols + nx;
+          if (occupied[idx] === 0 && pathVisited[idx] === 0) {
             neighbors.push({ x: nx, y: ny });
           }
         }
@@ -207,14 +315,15 @@ function findPathBacktracking(
 
     for (const next of neighbors) {
       path.push(next);
-      visited.add(`${next.x},${next.y}`);
+      const idx = next.y * cols + next.x;
+      pathVisited[idx] = 1;
 
       if (dfs(next)) {
         return true;
       }
 
       path.pop();
-      visited.delete(`${next.x},${next.y}`);
+      pathVisited[idx] = 0;
     }
 
     return false;
@@ -229,7 +338,7 @@ function findPathBacktracking(
 // Warnsdorff scoring count
 function getFreeNeighborCount(
   cell: Point,
-  occupied: Set<string>,
+  occupied: Uint8Array,
   shapeMask: boolean[][],
   rows: number,
   cols: number
@@ -245,7 +354,8 @@ function getFreeNeighborCount(
     const nx = cell.x + d.dx;
     const ny = cell.y + d.dy;
     if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && shapeMask[ny][nx]) {
-      if (!occupied.has(`${nx},${ny}`)) {
+      const idx = ny * cols + nx;
+      if (occupied[idx] === 0) {
         count++;
       }
     }
@@ -270,55 +380,6 @@ function getDistanceToBoundary(
   if (dir === "right") return cols - 1 - head.x;
   if (dir === "up") return head.y;
   return rows - 1 - head.y;
-}
-
-// Validation to check if any isolated unoccupied region is larger than 2 cells
-function hasLargeIsolatedEmptyRegions(
-  occupied: Set<string>,
-  shapeMask: boolean[][],
-  rows: number,
-  cols: number
-): boolean {
-  const visited = new Set<string>();
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (!shapeMask[r][c] || occupied.has(`${c},${r}`)) continue;
-      const key = `${c},${r}`;
-      if (visited.has(key)) continue;
-
-      const component: Point[] = [{ x: c, y: r }];
-      visited.add(key);
-      let qIdx = 0;
-
-      while (qIdx < component.length) {
-        const curr = component[qIdx++];
-        const dirs = [
-          { dx: 1, dy: 0 },
-          { dx: -1, dy: 0 },
-          { dx: 0, dy: 1 },
-          { dx: 0, dy: -1 },
-        ];
-        for (const d of dirs) {
-          const nx = curr.x + d.dx;
-          const ny = curr.y + d.dy;
-          if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && shapeMask[ny][nx]) {
-            const nKey = `${nx},${ny}`;
-            if (!occupied.has(nKey) && !visited.has(nKey)) {
-              visited.add(nKey);
-              component.push({ x: nx, y: ny });
-            }
-          }
-        }
-      }
-
-      if (component.length > 2) {
-        return true; // found isolated region of empty cells larger than 2
-      }
-    }
-  }
-
-  return false;
 }
 
 // Simulation metrics analyzer
@@ -454,20 +515,21 @@ function analyzeGridMetrics(
   return { metrics, difficulty };
 }
 
-// Microsecond solver
+// Microsecond solver using fast flat occupied arrays
 function solveGrid(arrows: Arrow[], rows: number, cols: number): boolean {
-  const removed = new Set<string>();
+  const numArrows = arrows.length;
+  const occupied = new Uint8Array(rows * cols);
 
-  const canEscapeSim = (arrow: Arrow): boolean => {
-    const otherOccupied = new Set<string>();
-    for (const a of arrows) {
-      if (a.id !== arrow.id && !removed.has(a.id)) {
-        for (const cell of a.cells) {
-          otherOccupied.add(`${cell.x},${cell.y}`);
-        }
-      }
+  for (const a of arrows) {
+    for (const cell of a.cells) {
+      occupied[cell.y * cols + cell.x] = 1;
     }
+  }
 
+  const removed = new Uint8Array(numArrows);
+  let removedCount = 0;
+
+  function canEscapeSim(arrow: Arrow): boolean {
     const head = arrow.cells[arrow.cells.length - 1];
     const dir = arrow.direction;
     let cx = head.x;
@@ -483,27 +545,99 @@ function solveGrid(arrows: Arrow[], rows: number, cols: number): boolean {
         break;
       }
 
-      if (otherOccupied.has(`${cx},${cy}`)) {
+      const idx = cy * cols + cx;
+      if (occupied[idx] === 1) {
         return false;
       }
     }
 
     return true;
-  };
+  }
 
   let progress = true;
-  while (progress && removed.size < arrows.length) {
+  while (progress && removedCount < numArrows) {
     progress = false;
-    for (const a of arrows) {
-      if (!removed.has(a.id) && canEscapeSim(a)) {
-        removed.add(a.id);
+    for (let i = 0; i < numArrows; i++) {
+      if (removed[i] === 1) continue;
+      const a = arrows[i];
+
+      // Temporarily clear current arrow's cells
+      for (const cell of a.cells) {
+        occupied[cell.y * cols + cell.x] = 0;
+      }
+
+      if (canEscapeSim(a)) {
+        removed[i] = 1;
+        removedCount++;
         progress = true;
         break;
+      } else {
+        // Restore current arrow's cells
+        for (const cell of a.cells) {
+          occupied[cell.y * cols + cell.x] = 1;
+        }
       }
     }
   }
 
-  return removed.size === arrows.length;
+  return removedCount === numArrows;
+}
+
+// Dead-end pruning check: returns true if any isolated group of free cells has size < 3
+function isPackingDeadEnd(
+  occupied: Uint8Array,
+  shapeMask: boolean[][],
+  rows: number,
+  cols: number,
+  visited: Int32Array,
+  q: Int32Array,
+  visitedToken: { value: number }
+): boolean {
+  visitedToken.value++;
+  const token = visitedToken.value;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      if (!shapeMask[r][c] || occupied[idx] === 1) continue;
+      if (visited[idx] === token) continue;
+
+      let qHead = 0;
+      let qTail = 0;
+      q[qTail++] = idx;
+      visited[idx] = token;
+
+      while (qHead < qTail) {
+        const currIdx = q[qHead++];
+        const cx = currIdx % cols;
+        const cy = Math.floor(currIdx / cols);
+
+        const dirs = [
+          { dx: 1, dy: 0 },
+          { dx: -1, dy: 0 },
+          { dx: 0, dy: 1 },
+          { dx: 0, dy: -1 },
+        ];
+        for (const d of dirs) {
+          const nx = cx + d.dx;
+          const ny = cy + d.dy;
+          if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && shapeMask[ny][nx]) {
+            const nIdx = ny * cols + nx;
+            if (occupied[nIdx] === 0 && visited[nIdx] !== token) {
+              visited[nIdx] = token;
+              q[qTail++] = nIdx;
+            }
+          }
+        }
+      }
+
+      if (qTail < 3) {
+        return true; // Prune!
+      }
+    }
+  }
+
+  return false;
 }
 
 // Main procedural level generator
@@ -524,21 +658,142 @@ export function generateLevel(levelNumber: number): GridState {
   }
 
   let attempts = 0;
-  while (attempts < 1000) {
+  // Try to find a perfect 100% covered, solvable board first
+  while (attempts < 500) {
     attempts++;
     const arrows: Arrow[] = [];
-    const occupied = new Set<string>();
-    let arrowIdCounter = 0;
+    
+    // Fast flat structures
+    const occupied = new Uint8Array(rows * cols);
+    const visited = new Int32Array(rows * cols);
+    const q = new Int32Array(rows * cols);
+    const visitedToken = { value: 0 };
+    const pathVisited = new Uint8Array(rows * cols);
 
-    const failedStartCells = new Set<string>();
+    let recursiveSteps = 0;
 
-    while (true) {
-      // Find all unoccupied playable cells
+    function pack(occupiedCount: number): boolean {
+      recursiveSteps++;
+      if (recursiveSteps > 1500) {
+        return false; // Limit depth to prevent UI freeze
+      }
+
+      if (occupiedCount === totalActive) {
+        return solveGrid(arrows, rows, cols);
+      }
+
+      if (isPackingDeadEnd(occupied, shapeMask, rows, cols, visited, q, visitedToken)) {
+        return false;
+      }
+
       const freeCells: Point[] = [];
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          const key = `${c},${r}`;
-          if (shapeMask[r][c] && !occupied.has(key)) {
+          const idx = r * cols + c;
+          if (shapeMask[r][c] && occupied[idx] === 0) {
+            freeCells.push({ x: c, y: r });
+          }
+        }
+      }
+
+      if (freeCells.length === 0) return false;
+
+      const cellScores = freeCells.map((cell) => ({
+        cell,
+        score: getFreeNeighborCount(cell, occupied, shapeMask, rows, cols),
+      }));
+
+      const validStartCells = cellScores.filter((item) => item.score > 0);
+      if (validStartCells.length === 0) return false;
+
+      validStartCells.sort((a, b) => a.score - b.score);
+
+      const minScore = validStartCells[0].score;
+      const candidates = validStartCells.filter((item) => item.score === minScore);
+      const chosenItem = candidates[Math.floor(rand() * candidates.length)];
+      const startCell = chosenItem.cell;
+
+      const startLen = Math.min(12, Math.max(3, 5 + Math.floor(rand() * 8)));
+
+      for (let len = startLen; len >= 3; len--) {
+        const path = findPathBacktracking(startCell, len, occupied, shapeMask, rows, cols, rand, pathVisited);
+        if (!path) continue;
+
+        const dirNormal = getPathDirection(path[path.length - 2], path[path.length - 1]);
+        const distNormal = getDistanceToBoundary(path[path.length - 1], dirNormal, rows, cols);
+
+        const dirReversed = getPathDirection(path[1], path[0]);
+        const distReversed = getDistanceToBoundary(path[0], dirReversed, rows, cols);
+
+        let finalPath = path;
+        let finalDir = dirNormal;
+
+        if (distReversed < distNormal) {
+          finalPath = [...path].reverse();
+          finalDir = dirReversed;
+        }
+
+        // Add path to occupied
+        for (const p of finalPath) {
+          occupied[p.y * cols + p.x] = 1;
+        }
+
+        const newArrow: Arrow = {
+          id: `A-${levelNumber}-${arrows.length}`,
+          direction: finalDir,
+          cells: finalPath,
+          isRemoved: false,
+        };
+        arrows.push(newArrow);
+
+        if (pack(occupiedCount + finalPath.length)) {
+          return true;
+        }
+
+        // Backtrack
+        arrows.pop();
+        for (const p of finalPath) {
+          occupied[p.y * cols + p.x] = 0;
+        }
+      }
+
+      return false;
+    }
+
+    if (pack(0)) {
+      const { metrics, difficulty } = analyzeGridMetrics(arrows, rows, cols);
+      return {
+        rows,
+        cols,
+        shape,
+        shapeMask,
+        arrows,
+        levelNumber,
+        totalArrows: arrows.length,
+        removedCount: 0,
+        seed: levelSeed,
+        difficulty,
+        metrics,
+      };
+    }
+  }
+
+  // Fallback: If 100% packing is slow, run a relaxed greedy pack that targets 92%+ coverage
+  let fallbackAttempts = 0;
+  while (fallbackAttempts < 200) {
+    fallbackAttempts++;
+    const arrows: Arrow[] = [];
+    const occupied = new Uint8Array(rows * cols);
+    let arrowIdCounter = 0;
+    const failedStartCells = new Uint8Array(rows * cols);
+    const pathVisited = new Uint8Array(rows * cols);
+
+    while (true) {
+      const freeCells: Point[] = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * cols + c;
+          if (shapeMask[r][c] && occupied[idx] === 0) {
             freeCells.push({ x: c, y: r });
           }
         }
@@ -546,7 +801,6 @@ export function generateLevel(levelNumber: number): GridState {
 
       if (freeCells.length === 0) break;
 
-      // Warnsdorff score
       const cellScores = freeCells.map((cell) => ({
         cell,
         score: getFreeNeighborCount(cell, occupied, shapeMask, rows, cols),
@@ -555,12 +809,11 @@ export function generateLevel(levelNumber: number): GridState {
       const validStartCells = cellScores.filter(
         (item) =>
           item.score > 0 &&
-          !failedStartCells.has(`${item.cell.x},${item.cell.y}`)
+          failedStartCells[item.cell.y * cols + item.cell.x] === 0
       );
 
       if (validStartCells.length === 0) break;
 
-      // Prefer cells with fewest unoccupied neighbors (corners and wall-huggers)
       validStartCells.sort((a, b) => a.score - b.score);
 
       const minScore = validStartCells[0].score;
@@ -569,20 +822,18 @@ export function generateLevel(levelNumber: number): GridState {
       const startCell = chosenItem.cell;
 
       let path: Point[] | null = null;
-      // Target winding length between 5 and 12, scaling down to 3 if blocked
       const startLen = Math.min(12, Math.max(3, 5 + Math.floor(rand() * 8)));
 
       for (let len = startLen; len >= 3; len--) {
-        path = findPathBacktracking(startCell, len, occupied, shapeMask, rows, cols, rand);
+        path = findPathBacktracking(startCell, len, occupied, shapeMask, rows, cols, rand, pathVisited);
         if (path) break;
       }
 
       if (!path) {
-        failedStartCells.add(`${startCell.x},${startCell.y}`);
+        failedStartCells[startCell.y * cols + startCell.x] = 1;
         continue;
       }
 
-      // Orientation scoring: Normal vs Reversed path directions
       const dirNormal = getPathDirection(path[path.length - 2], path[path.length - 1]);
       const distNormal = getDistanceToBoundary(path[path.length - 1], dirNormal, rows, cols);
 
@@ -598,7 +849,7 @@ export function generateLevel(levelNumber: number): GridState {
       }
 
       for (const p of finalPath) {
-        occupied.add(`${p.x},${p.y}`);
+        occupied[p.y * cols + p.x] = 1;
       }
 
       arrows.push({
@@ -608,45 +859,33 @@ export function generateLevel(levelNumber: number): GridState {
         isRemoved: false,
       });
 
-      failedStartCells.clear();
+      failedStartCells.fill(0);
     }
 
-    const occupiedCount = occupied.size;
+    let occupiedCount = 0;
+    for (let i = 0; i < occupied.length; i++) {
+      if (occupied[i] === 1) occupiedCount++;
+    }
     const coverage = occupiedCount / totalActive;
-
-    // Strict target coverage: 92%-98%
-    let targetCoverage = 0.95;
-    if (attempts > 200) targetCoverage = 0.92;
-    if (attempts > 500) targetCoverage = 0.90;
-
-    if (coverage >= targetCoverage && coverage <= 0.98) {
-      // Reject if any isolated empty region is larger than 2 cells
-      if (hasLargeIsolatedEmptyRegions(occupied, shapeMask, rows, cols)) {
-        continue;
-      }
-
-      // Verify solvability
-      if (solveGrid(arrows, rows, cols)) {
-        const { metrics, difficulty } = analyzeGridMetrics(arrows, rows, cols);
-
-        return {
-          rows,
-          cols,
-          shape,
-          shapeMask,
-          arrows,
-          levelNumber,
-          totalArrows: arrows.length,
-          removedCount: 0,
-          seed: levelSeed,
-          difficulty,
-          metrics,
-        };
-      }
+    if (coverage >= 0.92 && solveGrid(arrows, rows, cols)) {
+      const { metrics, difficulty } = analyzeGridMetrics(arrows, rows, cols);
+      return {
+        rows,
+        cols,
+        shape,
+        shapeMask,
+        arrows,
+        levelNumber,
+        totalArrows: arrows.length,
+        removedCount: 0,
+        seed: levelSeed,
+        difficulty,
+        metrics,
+      };
     }
   }
 
-  // Fallback: simple dense, solvable layout of straight rows
+  // Double fallback: straight grid of arrows
   const fallbackArrows: Arrow[] = [];
   let arrowId = 0;
   for (let r = 0; r < rows; r++) {
