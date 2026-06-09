@@ -4,38 +4,33 @@ import { useSettingsStore } from '../store/useSettingsStore';
 /**
  * Hook for playing game sound effects.
  * Checks the user's sound preference before playing anything.
- *
- * Usage example:
- *   const { playTap, playWin } = useSound();
- *   onPress={() => { playTap(); doSomething(); }}
- *
- * NOTE: Place your .mp3/.wav files in assets/sounds/
- * and update the require() paths below when you add them.
  */
 export function useSound() {
   const { sounds } = useSettingsStore();
 
-  // Uncomment and update these when you add audio assets:
-  // const tapPlayer = useAudioPlayer(require('../assets/sounds/tap.mp3'));
-  // const winPlayer = useAudioPlayer(require('../assets/sounds/win.mp3'));
-  // const hintPlayer = useAudioPlayer(require('../assets/sounds/hint.mp3'));
+  const tapPlayer = useAudioPlayer(require('../assets/arrow_click_sound_effect.wav'));
 
   const playTap = async () => {
     if (!sounds) return;
-    // tapPlayer.seekTo(0);
-    // tapPlayer.play();
+    try {
+      tapPlayer.seekTo(0);
+      tapPlayer.play();
+    } catch (e) {
+      // Safe fallback if audio is not fully loaded or seek fails
+      try {
+        tapPlayer.play();
+      } catch (_) {}
+    }
   };
 
   const playWin = async () => {
     if (!sounds) return;
-    // winPlayer.seekTo(0);
-    // winPlayer.play();
+    // Optional placeholder
   };
 
   const playHint = async () => {
     if (!sounds) return;
-    // hintPlayer.seekTo(0);
-    // hintPlayer.play();
+    // Optional placeholder
   };
 
   return { playTap, playWin, playHint };

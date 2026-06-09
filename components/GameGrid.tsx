@@ -12,14 +12,16 @@ import { CELL_GAP, getCellSize, GRID_PADDING } from "../constants/config";
 import { COLORS } from "../constants/theme";
 import { useGameStore } from "../store/useGameStore";
 import { useSettingsStore } from "../store/useSettingsStore";
+import { useSound } from "../hooks/useSound";
 import { ArrowCell } from "./ArrowCell";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export const GameGrid: React.FC = () => {
-  const { grid, tapArrow, removeArrowState, hintCellIds, isWon } =
+  const { grid, tapArrow, removeArrowState, hintCellIds, isWon, selectedArrowId } =
     useGameStore();
   const { haptics } = useSettingsStore();
+  const { playTap } = useSound();
 
   const [shakingArrowId, setShakingArrowId] = useState<string | null>(null);
 
@@ -58,7 +60,7 @@ export const GameGrid: React.FC = () => {
   // RNGH v2 Gestures
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
-      scale.value = Math.max(1, Math.min(4, savedScale.value * e.scale));
+      scale.value = Math.max(0.5, Math.min(4, savedScale.value * e.scale));
     })
     .onEnd(() => {
       savedScale.value = scale.value;
@@ -66,28 +68,19 @@ export const GameGrid: React.FC = () => {
 
   const panGesture = Gesture.Pan()
     .onUpdate((e) => {
-      if (scale.value > 1) {
-        const tx = savedTranslateX.value + e.translationX;
-        const ty = savedTranslateY.value + e.translationY;
+      const tx = savedTranslateX.value + e.translationX;
+      const ty = savedTranslateY.value + e.translationY;
 
-        // Keep the board from dragging off-screen
-        const boundX = (boardWidth * (scale.value - 1)) / 2;
-        const boundY = (boardHeight * (scale.value - 1)) / 2;
+      // Allow dragging in all directions. Limit drag distance to avoid losing the board.
+      const limitX = Math.max(SCREEN_WIDTH * 0.8, (boardWidth * scale.value) / 2);
+      const limitY = Math.max(SCREEN_HEIGHT * 0.6, (boardHeight * scale.value) / 2);
 
-        translateX.value = Math.max(-boundX, Math.min(boundX, tx));
-        translateY.value = Math.max(-boundY, Math.min(boundY, ty));
-      }
+      translateX.value = Math.max(-limitX, Math.min(limitX, tx));
+      translateY.value = Math.max(-limitY, Math.min(limitY, ty));
     })
     .onEnd(() => {
-      if (scale.value <= 1.05) {
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedTranslateX.value = 0;
-        savedTranslateY.value = 0;
-      } else {
-        savedTranslateX.value = translateX.value;
-        savedTranslateY.value = translateY.value;
-      }
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
       savedScale.value = scale.value;
     });
 
@@ -121,11 +114,12 @@ export const GameGrid: React.FC = () => {
       <GestureDetector gesture={gesture}>
         <Animated.View
           style={[
+            styles.board,
             { width: boardWidth, height: boardHeight },
             animatedBoardStyle,
           ]}
         >
-          {/* Layer 1: Static Background Dot Grid */}
+          {/* Layer 1: Static Background Dot Grid (Drawn in background, covered by arrows) */}
           <Svg
             width={boardWidth}
             height={boardHeight}
@@ -136,8 +130,9 @@ export const GameGrid: React.FC = () => {
                 key={index}
                 cx={dot.x}
                 cy={dot.y}
-                r={1.5}
-                fill="#D1D5DB"
+                r={3.5}
+                fill={COLORS.dot}
+                opacity={0.8}
               />
             ))}
           </Svg>
@@ -151,11 +146,8 @@ export const GameGrid: React.FC = () => {
               const escaped = tapArrow(arrow.id);
 
               if (escaped) {
-                if (haptics) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                    () => {},
-                  );
-                }
+                // Play arrow click sound effect
+                playTap();
               } else {
                 if (haptics) {
                   Haptics.notificationAsync(
@@ -174,8 +166,16 @@ export const GameGrid: React.FC = () => {
                 cellGap={CELL_GAP}
                 padding={GRID_PADDING}
                 isHint={isHint}
+                isSelected={selectedArrowId === arrow.id}
                 onTap={handleTap}
-                onEscapeComplete={() => removeArrowState(arrow.id)}
+                onEscapeComplete={() => {
+                  if (haptics) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+                      () => {},
+                    );
+                  }
+                  removeArrowState(arrow.id);
+                }}
                 triggerShake={shakingArrowId === arrow.id}
                 onShakeDone={() => handleShakeDone(arrow.id)}
                 svgWidth={boardWidth}
@@ -194,5 +194,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "visible", // Allow escaping arrows to travel far away off the screen boundaries
+  },
+  board: {
+    backgroundColor: "transparent",
+    overflow: "visible", // Ensure escaping arrows are not clipped by the canvas container
   },
 });

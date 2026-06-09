@@ -1,13 +1,15 @@
 import { getGridSize } from "../engine/generateLevel";
 
-export const GRID_PADDING = 24; // horizontal padding fallback
-export const CELL_GAP = 2; // gap between cells (reduced for density)
+export const GRID_PADDING = 0; // Grid content padding is 0 as padding is handled by the board container
+export const CELL_GAP = 2; // gap between cells (density)
 
 export function getCellSize(screenWidth: number, cols: number): number {
-  // Core board width is 70% of screenWidth (total width ~80% with padding)
-  const targetBoardWidth = screenWidth * 0.7;
+  // Target board container width = 80% screen width
+  const boardWidth = Math.floor(screenWidth * 0.80);
+  // Grid content width = boardWidth minus 16px padding on left & right (32px total)
+  const contentWidth = boardWidth - 32;
   const totalGap = CELL_GAP * (cols - 1);
-  return Math.floor((targetBoardWidth - totalGap) / cols);
+  return Math.floor((contentWidth - totalGap) / cols);
 }
 
 export function getDifficulty(level: number): "Easy" | "Normal" | "Hard" {

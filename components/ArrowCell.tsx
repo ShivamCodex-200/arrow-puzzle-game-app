@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
+  interpolateColor,
   runOnJS,
   useAnimatedProps,
   useAnimatedStyle,
@@ -22,6 +23,7 @@ interface Props {
   cellGap: number;
   padding: number;
   isHint: boolean;
+  isSelected: boolean;
   onTap: () => void;
   onEscapeComplete: () => void;
   triggerShake: boolean;
@@ -36,6 +38,7 @@ export const ArrowCell: React.FC<Props> = ({
   cellGap,
   padding,
   isHint,
+  isSelected,
   onTap,
   onEscapeComplete,
   triggerShake,
@@ -45,6 +48,7 @@ export const ArrowCell: React.FC<Props> = ({
 }) => {
   const progress = useSharedValue(0);
   const shakeX = useSharedValue(0);
+  const isSelectedVal = useSharedValue(0);
 
   const prevRemovedRef = useRef(false);
   const prevIdRef = useRef<string | undefined>(undefined);
@@ -61,7 +65,8 @@ export const ArrowCell: React.FC<Props> = ({
   const dir = arrow.direction;
 
   // Extend the path straight off-screen by N cells so the tail can exit fully
-  for (let i = 1; i <= arrow.cells.length + 2; i++) {
+  const OVERSHOOT_CELLS = 15;
+  for (let i = 1; i <= arrow.cells.length + OVERSHOOT_CELLS; i++) {
     let px = headPixel.x;
     let py = headPixel.y;
     if (dir === "right") px += i * stepDist;
@@ -78,6 +83,7 @@ export const ArrowCell: React.FC<Props> = ({
       prevRemovedRef.current = false;
       progress.value = 0;
       shakeX.value = 0;
+      isSelectedVal.value = 0;
     }
   }, [arrow.id]);
 
@@ -86,10 +92,13 @@ export const ArrowCell: React.FC<Props> = ({
     if (arrow.isRemoved && !prevRemovedRef.current) {
       prevRemovedRef.current = true;
 
-      // Crawl forward by cells.length units (entire length of the path)
+      const totalDistance = arrow.cells.length + OVERSHOOT_CELLS;
+      const animDuration = totalDistance * 35; // 35ms per cell speed
+
+      // Crawl forward by cells.length + OVERSHOOT_CELLS units (extend far outside the board area)
       progress.value = withTiming(
-        arrow.cells.length,
-        { duration: 320, easing: Easing.linear },
+        totalDistance,
+        { duration: animDuration, easing: Easing.linear },
         (finished) => {
           if (finished) {
             runOnJS(onEscapeComplete)();
@@ -98,6 +107,11 @@ export const ArrowCell: React.FC<Props> = ({
       );
     }
   }, [arrow.isRemoved]);
+
+  // ── Selection Highlight Animation ─────────────────────────────────────
+  useEffect(() => {
+    isSelectedVal.value = withTiming(isSelected ? 1 : 0, { duration: 120 });
+  }, [isSelected]);
 
   // ── Shake animation when blocked ──────────────────────────────────────────
   useEffect(() => {
@@ -122,8 +136,13 @@ export const ArrowCell: React.FC<Props> = ({
     const p = progress.value;
     const len = basePixels.length;
 
-    if (p >= len) {
-      return { d: "M 0 0" };
+    // Interpolate stroke color dynamically
+    const defaultColor = isHint ? COLORS.arrowHint : COLORS.arrowNormal;
+    const selectedColor = "#3B82F6"; // bright blue
+    const stroke = interpolateColor(isSelectedVal.value, [0, 1], [defaultColor, selectedColor]);
+
+    if (p >= len + 15.0) {
+      return { d: "M 0 0", stroke: "transparent" };
     }
 
     const t_start = p;
@@ -156,7 +175,8 @@ export const ArrowCell: React.FC<Props> = ({
     }
 
     d += ` L ${ptEnd.x} ${ptEnd.y}`;
-    return { d };
+
+    return { d, stroke };
   });
 
   const animatedHeadProps = useAnimatedProps(() => {
@@ -164,8 +184,13 @@ export const ArrowCell: React.FC<Props> = ({
     const p = progress.value;
     const len = basePixels.length;
 
-    if (p >= len) {
-      return { d: "M 0 0" };
+    // Interpolate stroke color dynamically
+    const defaultColor = isHint ? COLORS.arrowHint : COLORS.arrowNormal;
+    const selectedColor = "#3B82F6"; // bright blue
+    const stroke = interpolateColor(isSelectedVal.value, [0, 1], [defaultColor, selectedColor]);
+
+    if (p >= len + 15.0) {
+      return { d: "M 0 0", stroke: "transparent" };
     }
 
     const t_end = len - 1 + p;
@@ -182,7 +207,7 @@ export const ArrowCell: React.FC<Props> = ({
     };
 
     const ptEnd = getPoint(t_end);
-    const headSize = 7;
+    const headSize = 6; // slightly smaller arrowheads
 
     let headD = "";
     if (dir === "right") {
@@ -195,7 +220,7 @@ export const ArrowCell: React.FC<Props> = ({
       headD = `M ${ptEnd.x - headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y - headSize}`;
     }
 
-    return { d: headD };
+    return { d: headD, stroke };
   });
 
   // ── Shake translation style ───────────────────────────────────────────────
@@ -204,26 +229,24 @@ export const ArrowCell: React.FC<Props> = ({
   }));
 
   const occupiedCells = getOccupiedCells(arrow);
-  const strokeColor = isHint ? COLORS.arrowHint : COLORS.arrowNormal;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, { overflow: 'visible' }]} pointerEvents="box-none">
       {/* Visual rendering layer clipped to the grid canvas boundary */}
       <Animated.View
-        style={[StyleSheet.absoluteFill, shakeStyle]}
+        style={[StyleSheet.absoluteFill, shakeStyle, { overflow: 'visible' }]}
         pointerEvents="none"
       >
         <Svg
           width={svgWidth}
           height={svgHeight}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { overflow: 'visible' }]}
           pointerEvents="none"
         >
           {/* Animated Stem */}
           <AnimatedPath
             animatedProps={animatedStemProps}
-            stroke={strokeColor}
-            strokeWidth={6}
+            strokeWidth={7}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
@@ -231,8 +254,7 @@ export const ArrowCell: React.FC<Props> = ({
           {/* Animated Arrowhead */}
           <AnimatedPath
             animatedProps={animatedHeadProps}
-            stroke={strokeColor}
-            strokeWidth={6}
+            strokeWidth={7}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"

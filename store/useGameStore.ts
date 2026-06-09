@@ -15,6 +15,7 @@ interface GameStore {
   history: GridState[];
   hints: number;
   hintCellIds: string[];
+  selectedArrowId: string | null;
 
   loadLevel: (level: number) => void;
   tapArrow: (arrowId: string) => boolean;
@@ -37,6 +38,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   history: [],
   hints: 3,
   hintCellIds: [],
+  selectedArrowId: null,
 
   // ── Load level ────────────────────────────────────────────────────────────
   loadLevel: (level: number) => {
@@ -50,6 +52,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
+      selectedArrowId: null,
       history: [],
       hintCellIds: [],
     });
@@ -69,6 +72,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({
         lives: newLives,
         isGameOver: newLives === 0,
+        selectedArrowId: null,
       });
       return false;
     }
@@ -85,6 +89,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: state.moves + 1,
       isWon: won,
       isDeadlocked: deadlocked,
+      selectedArrowId: arrowId,
       history: [...state.history.slice(-9), currentGridCopy],
       hintCellIds: [],
     });
@@ -109,7 +114,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Remove arrow from state completely ────────────────────────────────────
   // Called once the slide animation finishes so it is completely unmounted.
   removeArrowState: (arrowId: string) => {
-    const { grid } = get();
+    const { grid, selectedArrowId } = get();
     if (!grid) return;
 
     const newArrows = grid.arrows.filter((a) => a.id !== arrowId);
@@ -118,6 +123,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         ...grid,
         arrows: newArrows,
       },
+      selectedArrowId: selectedArrowId === arrowId ? null : selectedArrowId,
     });
   },
 
@@ -132,6 +138,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: Math.max(0, moves - 1),
       isWon: false,
       isDeadlocked: false,
+      selectedArrowId: null,
       hintCellIds: [],
     });
   },
@@ -168,6 +175,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
+      selectedArrowId: null,
       history: [],
       hintCellIds: [],
     });
@@ -187,6 +195,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
+      selectedArrowId: null,
       history: [],
       hintCellIds: [],
     });

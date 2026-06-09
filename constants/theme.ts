@@ -11,8 +11,8 @@ export const COLORS = {
   cardBgRemoved:   'transparent',
 
   // Arrow icons
-  arrowNormal:     '#1B2B4B',
-  arrowEscapable:  '#1B2B4B',
+  arrowNormal:     '#1F355E',
+  arrowEscapable:  '#1F355E',
   arrowHint:       '#22C55E',
 
   // Borders
@@ -20,13 +20,13 @@ export const COLORS = {
   borderHint:      '#22C55E',
 
   // Empty dot
-  dot:             '#94A3B8',
+  dot:             '#C2C7D0',
 
   // UI
   surface:         '#FFFFFF',
-  text:            '#1B2B4B',
+  text:            '#1F355E',
   textSecondary:   '#64748B',
-  accent:          '#1B2B4B',
+  accent:          '#1F355E',
   danger:          '#EF4444',
   success:         '#22C55E',
   warning:         '#F59E0B',
