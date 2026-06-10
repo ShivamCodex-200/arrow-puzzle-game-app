@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,7 +10,6 @@ import Animated, {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useGameStore } from '../store/useGameStore';
-import { COLORS, SHADOWS } from '../constants/theme';
 import { useRouter } from 'expo-router';
 
 export const GameOverOverlay: React.FC = () => {
@@ -51,102 +50,31 @@ export const GameOverOverlay: React.FC = () => {
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View className="absolute inset-0" pointerEvents="box-none">
       {/* Dim background */}
-      <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, bgStyle]} />
+      <Animated.View className="absolute inset-0 bg-slate-900/75" style={bgStyle} />
 
       {/* Card */}
-      <View style={styles.center}>
-        <Animated.View style={[styles.card, SHADOWS.surface, cardStyle]}>
+      <View className="flex-1 items-center justify-center px-7">
+        <Animated.View className="w-full max-w-[360px] bg-white rounded-[28px] p-7 items-center gap-3 shadow-2xl elevation-6" style={cardStyle}>
           {/* Failed Icon */}
-          <View style={styles.heartRing}>
+          <View className="w-20 h-20 rounded-full bg-red-100 items-center justify-center border-2 border-red-200 mb-1">
             <MaterialIcons name="heart-broken" size={52} color="#EF4444" />
           </View>
 
-          <Text style={styles.failTitle}>Level Failed!</Text>
-          <Text style={styles.failSub}>You ran out of lives. Keep trying! 💪</Text>
+          <Text className="text-[26px] font-black text-game-navy tracking-tight">Level Failed!</Text>
+          <Text className="text-[14px] text-game-secondary font-medium text-center">You ran out of lives. Keep trying! 💪</Text>
 
           {/* Buttons */}
-          <Pressable onPress={handleRetry} style={styles.btnRetry}>
-            <Text style={styles.btnRetryText}>Retry Level 🔄</Text>
+          <Pressable onPress={handleRetry} className="w-full bg-game-navy rounded-[16px] py-[15px] items-center mt-1">
+            <Text className="text-white text-[16px] font-black tracking-wide">Retry Level 🔄</Text>
           </Pressable>
 
-          <Pressable onPress={handleHome} style={styles.btnHome}>
-            <Text style={styles.btnHomeText}>Back to Home</Text>
+          <Pressable onPress={handleHome} className="w-full rounded-[16px] py-3 items-center border-[1.5px] border-game-dot">
+            <Text className="text-game-secondary text-[14px] font-bold">Back to Home</Text>
           </Pressable>
         </Animated.View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-  },
-  center: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  card: {
-    width:            '100%',
-    maxWidth:         360,
-    backgroundColor:  COLORS.cardBg,
-    borderRadius:     28,
-    padding:          28,
-    alignItems:       'center',
-    gap:              12,
-  },
-  heartRing: {
-    width:            80,
-    height:           80,
-    borderRadius:     40,
-    backgroundColor:  '#FEE2E2',
-    alignItems:       'center',
-    justifyContent:   'center',
-    borderWidth:      2,
-    borderColor:      '#FCA5A5',
-    marginBottom:     4,
-  },
-  failTitle: {
-    fontSize:      26,
-    fontWeight:    '800',
-    color:         COLORS.text,
-    letterSpacing: -0.5,
-  },
-  failSub: {
-    fontSize:   14,
-    color:      COLORS.textSecondary,
-    fontWeight: '500',
-    textAlign:  'center',
-  },
-  btnRetry: {
-    width:            '100%',
-    backgroundColor:  COLORS.accent,
-    borderRadius:     16,
-    paddingVertical:  15,
-    alignItems:       'center',
-    marginTop:        4,
-  },
-  btnRetryText: {
-    color:      '#FFFFFF',
-    fontSize:   16,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  btnHome: {
-    width:          '100%',
-    borderRadius:   16,
-    paddingVertical: 12,
-    alignItems:     'center',
-    borderWidth:    1.5,
-    borderColor:    COLORS.dot,
-  },
-  btnHomeText: {
-    color:      COLORS.textSecondary,
-    fontSize:   14,
-    fontWeight: '700',
-  },
-});

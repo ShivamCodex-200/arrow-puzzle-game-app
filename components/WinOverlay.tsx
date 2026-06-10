@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -13,7 +13,6 @@ import Animated, {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useGameStore } from '../store/useGameStore';
-import { COLORS, SHADOWS } from '../constants/theme';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -42,12 +41,8 @@ const Particle = ({ index }: { index: number }) => {
   }, []);
 
   const style = useAnimatedStyle(() => ({
-    position:        'absolute',
-    top:             0,
-    left:            0,
     width:           size,
     height:          size * 1.5,
-    borderRadius:    2,
     backgroundColor: color,
     transform: [
       { translateX: x.value },
@@ -57,7 +52,7 @@ const Particle = ({ index }: { index: number }) => {
     opacity: o.value,
   }));
 
-  return <Animated.View style={style} />;
+  return <Animated.View className="absolute top-0 left-0 rounded-[2px]" style={style} />;
 };
 
 // ── Win Overlay ───────────────────────────────────────────────────────────
@@ -97,28 +92,28 @@ export const WinOverlay: React.FC = () => {
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View className="absolute inset-0" pointerEvents="box-none">
       {/* Dim background */}
-      <Animated.View style={[StyleSheet.absoluteFill, styles.overlay, bgStyle]} />
+      <Animated.View className="absolute inset-0 bg-slate-900/75" style={bgStyle} />
 
       {/* Confetti */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View className="absolute inset-0" pointerEvents="none">
         {Array.from({ length: 45 }).map((_, i) => <Particle key={i} index={i} />)}
       </View>
 
       {/* Card */}
-      <View style={styles.center}>
-        <Animated.View style={[styles.card, SHADOWS.surface, cardStyle]}>
+      <View className="flex-1 items-center justify-center px-7">
+        <Animated.View className="w-full max-w-[360px] bg-white rounded-[28px] p-7 items-center gap-3 shadow-2xl elevation-6" style={cardStyle}>
           {/* Trophy */}
-          <View style={styles.trophyRing}>
+          <View className="w-20 h-20 rounded-full bg-amber-100 items-center justify-center border-2 border-amber-200 mb-1">
             <MaterialIcons name="emoji-events" size={52} color="#F59E0B" />
           </View>
 
-          <Text style={styles.winTitle}>Level {grid.levelNumber} Clear!</Text>
-          <Text style={styles.winSub}>Well played! 🎉</Text>
+          <Text className="text-[26px] font-black text-game-navy tracking-tight">Level {grid.levelNumber} Clear!</Text>
+          <Text className="text-[14px] text-game-secondary font-medium">Well played! 🎉</Text>
 
           {/* Stars */}
-          <View style={styles.starsRow}>
+          <View className="flex-row gap-2 my-1">
             {[1, 2, 3].map(i => (
               <MaterialIcons
                 key={i}
@@ -131,135 +126,28 @@ export const WinOverlay: React.FC = () => {
           </View>
 
           {/* Stats */}
-          <View style={styles.statsPill}>
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Moves</Text>
-              <Text style={styles.statVal}>{moves}</Text>
+          <View className="flex-row bg-game-bg rounded-[16px] py-3 px-6 gap-6 w-full justify-center items-center">
+            <View className="items-center gap-0.5">
+              <Text className="text-[11px] font-semibold text-game-secondary uppercase tracking-wider">Moves</Text>
+              <Text className="text-[20px] font-black text-game-navy">{moves}</Text>
             </View>
-            <View style={styles.statDivider} />
-            <View style={styles.stat}>
-              <Text style={styles.statLabel}>Stars</Text>
-              <Text style={[styles.statVal, { color: '#F59E0B' }]}>{stars} / 3</Text>
+            <View className="w-[1px] h-8 bg-game-dot" />
+            <View className="items-center gap-0.5">
+              <Text className="text-[11px] font-semibold text-game-secondary uppercase tracking-wider">Stars</Text>
+              <Text className="text-[20px] font-black text-amber-500">{stars} / 3</Text>
             </View>
           </View>
 
           {/* Buttons */}
-          <Pressable onPress={handleNext} style={styles.btnNext}>
-            <Text style={styles.btnNextText}>Next Level →</Text>
+          <Pressable onPress={handleNext} className="w-full bg-game-navy rounded-[16px] py-[15px] items-center mt-1">
+            <Text className="text-white text-[16px] font-black tracking-wide">Next Level →</Text>
           </Pressable>
 
-          <Pressable onPress={resetLevel} style={styles.btnReplay}>
-            <Text style={styles.btnReplayText}>Replay</Text>
+          <Pressable onPress={resetLevel} className="w-full rounded-[16px] py-3 items-center border-[1.5px] border-game-dot">
+            <Text className="text-game-secondary text-[14px] font-bold">Replay</Text>
           </Pressable>
         </Animated.View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  overlay: {
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-  },
-  center: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  card: {
-    width:            '100%',
-    maxWidth:         360,
-    backgroundColor:  COLORS.cardBg,
-    borderRadius:     28,
-    padding:          28,
-    alignItems:       'center',
-    gap:              12,
-  },
-  trophyRing: {
-    width:            80,
-    height:           80,
-    borderRadius:     40,
-    backgroundColor:  '#FEF3C7',
-    alignItems:       'center',
-    justifyContent:   'center',
-    borderWidth:      2,
-    borderColor:      '#FDE68A',
-    marginBottom:     4,
-  },
-  winTitle: {
-    fontSize:      26,
-    fontWeight:    '800',
-    color:         COLORS.text,
-    letterSpacing: -0.5,
-  },
-  winSub: {
-    fontSize:   14,
-    color:      COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap:           8,
-    marginVertical: 4,
-  },
-  statsPill: {
-    flexDirection:    'row',
-    backgroundColor:  COLORS.bgGradientStart,
-    borderRadius:     16,
-    paddingVertical:  12,
-    paddingHorizontal: 24,
-    gap:              24,
-    width:            '100%',
-    justifyContent:   'center',
-    alignItems:       'center',
-  },
-  stat: {
-    alignItems: 'center',
-    gap:        2,
-  },
-  statLabel: {
-    fontSize:   11,
-    fontWeight: '600',
-    color:      COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statVal: {
-    fontSize:   20,
-    fontWeight: '800',
-    color:      COLORS.text,
-  },
-  statDivider: {
-    width:           1,
-    height:          32,
-    backgroundColor: COLORS.dot,
-  },
-  btnNext: {
-    width:            '100%',
-    backgroundColor:  COLORS.accent,
-    borderRadius:     16,
-    paddingVertical:  15,
-    alignItems:       'center',
-    marginTop:        4,
-  },
-  btnNextText: {
-    color:      '#FFFFFF',
-    fontSize:   16,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  btnReplay: {
-    width:          '100%',
-    borderRadius:   16,
-    paddingVertical: 12,
-    alignItems:     'center',
-    borderWidth:    1.5,
-    borderColor:    COLORS.dot,
-  },
-  btnReplayText: {
-    color:      COLORS.textSecondary,
-    fontSize:   14,
-    fontWeight: '700',
-  },
-});

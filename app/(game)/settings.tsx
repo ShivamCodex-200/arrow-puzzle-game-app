@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  View, Text, Pressable, Switch, ScrollView, StyleSheet, StatusBar,
+  View, Text, Pressable, Switch, ScrollView, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -8,7 +8,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useProgressStore } from '../../store/useProgressStore';
-import { COLORS, SHADOWS } from '../../constants/theme';
+import { COLORS } from '../../constants/theme';
 
 interface RowProps {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -20,13 +20,16 @@ interface RowProps {
 }
 
 const SettingRow: React.FC<RowProps> = ({ icon, label, sub, value, onToggle, trackColor = COLORS.accent }) => (
-  <View style={[styles.row, SHADOWS.card]}>
-    <View style={[styles.rowIcon, { backgroundColor: trackColor + '18' }]}>
-      <MaterialIcons name={icon} size={20} color={value ? trackColor : COLORS.textSecondary} />
+  <View className="flex-row items-center gap-3.5 bg-white rounded-[16px] p-3.5 mb-2.5 shadow shadow-[#1A2340]/10 elevation-3">
+    <View 
+      className="w-[38px] h-[38px] rounded-[10px] items-center justify-center" 
+      style={{ backgroundColor: trackColor + '18' }}
+    >
+      <MaterialIcons name={icon} size={20} color={value ? trackColor : '#64748B'} />
     </View>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowSub}>{sub}</Text>
+    <View className="flex-1">
+      <Text className="text-[15px] font-bold text-game-navy mb-[1px]">{label}</Text>
+      <Text className="text-[12px] text-game-secondary font-normal">{sub}</Text>
     </View>
     <Switch
       value={value}
@@ -47,21 +50,22 @@ export default function SettingsScreen() {
   return (
     <LinearGradient
       colors={[COLORS.bgGradientStart, COLORS.bgGradientEnd]}
-      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}
+      className="flex-1"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 16 }}
     >
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
-          <MaterialIcons name="arrow-back" size={22} color={COLORS.text} />
+      <View className="flex-row items-center justify-between px-4 py-3">
+        <Pressable onPress={() => router.back()} className="w-10 h-10 rounded-full bg-white items-center justify-center" hitSlop={8}>
+          <MaterialIcons name="arrow-back" size={22} color="#1F355E" />
         </Pressable>
-        <Text style={styles.title}>Settings</Text>
-        <View style={{ width: 40 }} />
+        <Text className="text-[18px] font-black text-game-navy tracking-tight">Settings</Text>
+        <View className="w-10" />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionLabel}>Preferences</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+        <Text className="text-[11px] font-bold text-game-secondary uppercase tracking-[1px] mb-2.5">Preferences</Text>
 
         <SettingRow
           icon="volume-up"
@@ -69,7 +73,7 @@ export default function SettingsScreen() {
           sub="Play audio cues on tap and win"
           value={sounds}
           onToggle={toggleSounds}
-          trackColor={COLORS.accent}
+          trackColor="#1F355E"
         />
 
         <SettingRow
@@ -81,61 +85,24 @@ export default function SettingsScreen() {
           trackColor="#8B5CF6"
         />
 
-        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Progress</Text>
+        <Text className="text-[11px] font-bold text-game-secondary uppercase tracking-[1px] mb-2.5 mt-6">Progress</Text>
 
         <Pressable
           onPress={() => { resetProgress(); router.replace('/(game)/home'); }}
-          style={[styles.dangerRow, SHADOWS.card]}
+          className="flex-row items-center gap-3.5 bg-white rounded-[16px] p-3.5 mb-2.5 border border-red-500/20 shadow shadow-[#1A2340]/10 elevation-3"
         >
-          <View style={[styles.rowIcon, { backgroundColor: COLORS.danger + '15' }]}>
-            <MaterialIcons name="delete-outline" size={20} color={COLORS.danger} />
+          <View className="w-[38px] h-[38px] rounded-[10px] items-center justify-center bg-red-500/10">
+            <MaterialIcons name="delete-outline" size={20} color="#EF4444" />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.rowLabel, { color: COLORS.danger }]}>Reset All Progress</Text>
-            <Text style={styles.rowSub}>Clears completed levels and stars</Text>
+          <View className="flex-1">
+            <Text className="text-[15px] font-bold text-red-500 mb-[1px]">Reset All Progress</Text>
+            <Text className="text-[12px] text-game-secondary font-normal">Clears completed levels and stars</Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={COLORS.danger} />
+          <MaterialIcons name="chevron-right" size={18} color="#EF4444" />
         </Pressable>
 
-        <Text style={styles.footer}>Arrow Puzzle · Infinite Levels</Text>
+        <Text className="text-center text-game-secondary text-[12px] font-medium mt-6">Arrow Puzzle · Infinite Levels</Text>
       </ScrollView>
     </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: COLORS.cardBg, alignItems: 'center', justifyContent: 'center',
-  },
-  title: { fontSize: 18, fontWeight: '800', color: COLORS.text, letterSpacing: -0.3 },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', color: COLORS.textSecondary,
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10,
-  },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: COLORS.cardBg, borderRadius: 16,
-    padding: 14, marginBottom: 10,
-  },
-  rowIcon: {
-    width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-  },
-  rowLabel: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 1 },
-  rowSub:   { fontSize: 12, color: COLORS.textSecondary, fontWeight: '400' },
-  dangerRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: COLORS.cardBg, borderRadius: 16, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: COLORS.danger + '25',
-  },
-  footer: {
-    textAlign: 'center', color: COLORS.textSecondary, fontSize: 12,
-    fontWeight: '500', marginTop: 24,
-  },
-});

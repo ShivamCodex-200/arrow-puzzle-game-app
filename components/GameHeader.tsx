@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
@@ -10,7 +10,6 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useGameStore } from '../store/useGameStore';
-import { COLORS } from '../constants/theme';
 import { getDifficulty } from '../constants/config';
 
 const DIFF_COLOR: Record<string, string> = {
@@ -50,206 +49,92 @@ export const GameHeader: React.FC = () => {
   }));
 
   return (
-    <View style={styles.container}>
+    <View className="px-4 pt-2 pb-1.5 gap-2">
       {/* Top row: back button / level title + difficulty / settings */}
-      <View style={styles.topRow}>
+      <View className="flex-row items-center justify-between">
         <Pressable
           onPress={() => router.replace('/(game)/home')}
-          style={styles.iconBtn}
+          className="w-10 h-10 items-center justify-center rounded-full bg-white shadow shadow-game-navy/5 elevation-2"
           hitSlop={8}
         >
-          <MaterialIcons name="arrow-back" size={22} color={COLORS.text} />
+          <MaterialIcons name="arrow-back" size={22} color="#1F355E" />
         </Pressable>
 
-        <View style={styles.titleGroup}>
-          <Text style={styles.levelText}>Level {level}</Text>
-          <View style={[styles.diffBadge, { backgroundColor: diffColor + '22' }]}>
-            <Text style={[styles.diffText, { color: diffColor }]}>{diff}</Text>
+        <View className="items-center gap-0.5">
+          <Text className="text-[18px] font-black text-game-navy tracking-tight">Level {level}</Text>
+          <View 
+            className="px-2.5 py-0.5 rounded-full" 
+            style={{ backgroundColor: diffColor + '22' }}
+          >
+            <Text className="text-[11px] font-bold tracking-wider" style={{ color: diffColor }}>{diff}</Text>
           </View>
         </View>
 
         <Pressable
           onPress={() => router.push('/(game)/settings')}
-          style={styles.iconBtn}
+          className="w-10 h-10 items-center justify-center rounded-full bg-white shadow shadow-game-navy/5 elevation-2"
           hitSlop={8}
         >
-          <MaterialIcons name="settings" size={22} color={COLORS.text} />
+          <MaterialIcons name="settings" size={22} color="#1F355E" />
         </Pressable>
       </View>
 
       {/* Second row (sub-header): Remaining Count (top-left aligned) | Hearts centered */}
-      <View style={styles.secondRow}>
+      <View className="flex-row items-center justify-between px-1 mt-0.5">
         {/* Remaining arrows pill */}
-        <Animated.View style={[styles.remainingPill, animatedPillStyle]}>
-          <MaterialIcons name="call-made" size={14} color={COLORS.text} style={styles.remainingIcon} />
-          <Text style={styles.remainingText}>{remainingCount}</Text>
+        <Animated.View 
+          className="flex-row items-center bg-white px-2.5 py-1 rounded-[14px] border border-slate-200 gap-[3px] min-w-[52px] justify-center" 
+          style={animatedPillStyle}
+        >
+          <MaterialIcons name="call-made" size={14} color="#1F355E" />
+          <Text className="text-[13px] font-black text-game-navy">{remainingCount}</Text>
         </Animated.View>
 
         {/* Hearts row (chances remaining) */}
-        <View style={styles.heartsRow}>
+        <View className="flex-row items-center gap-1.5">
           {Array.from({ length: 3 }).map((_, idx) => (
             <MaterialIcons
               key={idx}
               name={idx < lives ? "favorite" : "favorite-border"}
               size={18}
               color={idx < lives ? "#EF4444" : "#D1D5DB"}
-              style={styles.heartIcon}
+              className="mx-[1px] scale-[1.05]"
             />
           ))}
         </View>
 
         {/* Balance spacer matching the width of the remaining badge */}
-        <View style={styles.spacerPill} />
+        <View className="w-[52px]" />
       </View>
 
       {/* Bottom row: moves count | Undo + Reset actions */}
-      <View style={styles.bottomRow}>
-        <View style={styles.movesGroup}>
-          <MaterialIcons name="swap-vert" size={14} color={COLORS.textSecondary} />
-          <Text style={styles.movesText}>Moves: {moves}</Text>
+      <View className="flex-row items-center justify-between px-1 mt-0.5">
+        <View className="flex-row items-center gap-1">
+          <MaterialIcons name="swap-vert" size={14} color="#64748B" />
+          <Text className="text-[13px] font-semibold text-game-secondary">Moves: {moves}</Text>
         </View>
 
-        <View style={styles.actionGroup}>
+        <View className="flex-row items-center gap-3">
           <Pressable
             onPress={undoMove}
             disabled={!canUndo}
-            style={[styles.actionBtn, !canUndo && styles.disabled]}
+            className={`flex-row items-center gap-1 ${!canUndo ? 'opacity-[0.35]' : ''}`}
             hitSlop={8}
           >
-            <MaterialIcons name="undo" size={15} color={canUndo ? COLORS.accent : COLORS.textSecondary} />
-            <Text style={[styles.actionText, { color: canUndo ? COLORS.accent : COLORS.textSecondary }]}>
+            <MaterialIcons name="undo" size={15} color={canUndo ? "#1F355E" : "#64748B"} />
+            <Text className={`text-[13px] font-bold ${canUndo ? 'text-game-navy' : 'text-game-secondary'}`}>
               Undo
             </Text>
           </Pressable>
 
-          <View style={styles.divider} />
+          <View className="w-[1px] h-3.5 bg-game-dot" />
 
-          <Pressable onPress={resetLevel} style={styles.actionBtn} hitSlop={8}>
-            <MaterialIcons name="refresh" size={15} color={COLORS.accent} />
-            <Text style={[styles.actionText, { color: COLORS.accent }]}>Reset</Text>
+          <Pressable onPress={resetLevel} className="flex-row items-center gap-1" hitSlop={8}>
+            <MaterialIcons name="refresh" size={15} color="#1F355E" />
+            <Text className="text-[13px] font-bold text-game-navy">Reset</Text>
           </Pressable>
         </View>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingTop:        8,
-    paddingBottom:     6,
-    gap:               8,
-  },
-  topRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-  },
-  iconBtn: {
-    width:          40,
-    height:         40,
-    alignItems:     'center',
-    justifyContent: 'center',
-    borderRadius:   20,
-    backgroundColor: COLORS.cardBg,
-  },
-  titleGroup: {
-    alignItems: 'center',
-    gap:        2,
-  },
-  levelText: {
-    fontSize:   18,
-    fontWeight: '800',
-    color:      COLORS.text,
-    letterSpacing: -0.3,
-  },
-  diffBadge: {
-    paddingHorizontal: 10,
-    paddingVertical:   2,
-    borderRadius:      20,
-  },
-  diffText: {
-    fontSize:   11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  secondRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop:      2,
-  },
-  remainingPill: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius:    14,
-    borderWidth:     1,
-    borderColor:     '#E2E8F0',
-    gap:             3,
-    minWidth:        52,
-    justifyContent:  'center',
-  },
-  remainingIcon: {
-  },
-  remainingText: {
-    fontSize:   13,
-    fontWeight: '800',
-    color:      COLORS.text,
-  },
-  heartsRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           6,
-  },
-  heartIcon: {
-    marginHorizontal: 1,
-    transform: [{ scale: 1.05 }],
-  },
-  spacerPill: {
-    width: 52, // balances remainingPill width to keep hearts centered
-  },
-  bottomRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop:      2,
-  },
-  movesGroup: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           4,
-  },
-  movesText: {
-    fontSize:   13,
-    fontWeight: '600',
-    color:      COLORS.textSecondary,
-  },
-  actionGroup: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           12,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           4,
-  },
-  actionText: {
-    fontSize:   13,
-    fontWeight: '700',
-  },
-  divider: {
-    width:           1,
-    height:          14,
-    backgroundColor: COLORS.dot,
-  },
-  disabled: {
-    opacity: 0.35,
-  },
-});

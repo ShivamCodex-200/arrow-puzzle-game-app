@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import Animated, {
@@ -160,14 +160,14 @@ export default function SplashScreen() {
   }
 
   return (
-    <Animated.View style={[styles.container, animatedSplashStyle]}>
+    <Animated.View className="flex-1 bg-game-bg items-center justify-center" style={animatedSplashStyle}>
       <StatusBar barStyle="dark-content" backgroundColor="#EEF2F6" />
 
-      <View style={styles.centerContainer}>
+      <View className="items-center gap-9">
         {/* Animated Puzzle Board Container */}
-        <View style={styles.boardContainer}>
+        <View className="w-[200px] h-[200px] rounded-[28px] bg-white shadow-lg shadow-game-navy/10 elevation-4 overflow-hidden">
           {/* Layer 1: Dot Grid */}
-          <Animated.View style={[StyleSheet.absoluteFill, animatedGridStyle]}>
+          <Animated.View className="absolute inset-0" style={animatedGridStyle}>
             <Svg width={200} height={200} viewBox="0 0 200 200">
               {dots.map((dot, i) => (
                 <Circle
@@ -183,7 +183,7 @@ export default function SplashScreen() {
           </Animated.View>
 
           {/* Layer 2: Top Arrow ↓ (Navy) */}
-          <Animated.View style={[StyleSheet.absoluteFill, animatedTopArrowStyle]} pointerEvents="none">
+          <Animated.View className="absolute inset-0" style={animatedTopArrowStyle} pointerEvents="none">
             <Svg width={200} height={200} viewBox="0 0 200 200">
               <Path
                 d="M 120 40 L 120 120"
@@ -205,7 +205,7 @@ export default function SplashScreen() {
           </Animated.View>
 
           {/* Layer 3: Bottom Arrow ↑ (Navy) */}
-          <Animated.View style={[StyleSheet.absoluteFill, animatedBottomArrowStyle]} pointerEvents="none">
+          <Animated.View className="absolute inset-0" style={animatedBottomArrowStyle} pointerEvents="none">
             <Svg width={200} height={200} viewBox="0 0 200 200">
               <Path
                 d="M 80 160 L 80 80"
@@ -227,7 +227,7 @@ export default function SplashScreen() {
           </Animated.View>
 
           {/* Layer 4: Left Arrow → (Accent Green #4CAF50) */}
-          <Animated.View style={[StyleSheet.absoluteFill, animatedLeftArrowStyle]} pointerEvents="none">
+          <Animated.View className="absolute inset-0" style={animatedLeftArrowStyle} pointerEvents="none">
             <Svg width={200} height={200} viewBox="0 0 200 200">
               <Path
                 d="M 40 120 L 120 120"
@@ -249,7 +249,7 @@ export default function SplashScreen() {
           </Animated.View>
 
           {/* Layer 5: Right Arrow ← (Navy) */}
-          <Animated.View style={[StyleSheet.absoluteFill, animatedRightArrowStyle]} pointerEvents="none">
+          <Animated.View className="absolute inset-0" style={animatedRightArrowStyle} pointerEvents="none">
             <Svg width={200} height={200} viewBox="0 0 200 200">
               <Path
                 d="M 160 80 L 80 80"
@@ -272,11 +272,11 @@ export default function SplashScreen() {
         </View>
 
         {/* Text Logo & Tagline */}
-        <View style={styles.textContainer}>
-          <Animated.Text style={[styles.titleText, animatedLogoStyle]}>
+        <View className="items-center gap-1.5">
+          <Animated.Text className="text-[28px] font-black text-game-navy tracking-tight" style={animatedLogoStyle}>
             Arrow Puzzle
           </Animated.Text>
-          <Animated.Text style={[styles.taglineText, animatedTaglineStyle]}>
+          <Animated.Text className="text-[11px] font-bold text-game-secondary tracking-[2.5px] uppercase" style={animatedTaglineStyle}>
             Tap • Escape • Clear
           </Animated.Text>
         </View>
@@ -284,45 +284,3 @@ export default function SplashScreen() {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#EEF2F6', // Soft gray theme background
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerContainer: {
-    alignItems: 'center',
-    gap: 36,
-  },
-  boardContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 28,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#1F355E',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
-    overflow: 'hidden',
-  },
-  textContainer: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  titleText: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#1F355E', // Accent Navy
-    letterSpacing: -0.5,
-  },
-  taglineText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B', // Gray tagline
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-  },
-});

@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef } from "react";
-import { StatusBar, StyleSheet, View } from "react-native";
+import { StatusBar, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameGrid } from "../../components/GameGrid";
 import { GameHeader } from "../../components/GameHeader";
@@ -31,16 +31,14 @@ export default function PlayScreen() {
   return (
     <LinearGradient
       colors={[COLORS.bgGradientStart, COLORS.bgGradientEnd]}
-      style={styles.container}
+      className="flex-1"
     >
       <StatusBar barStyle="dark-content" />
 
       {/* Safe area padding manually so gradient fills full screen */}
       <View
-        style={[
-          styles.inner,
-          { paddingTop: insets.top, paddingBottom: insets.bottom },
-        ]}
+        className="flex-1"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
       >
         {grid ? (
           <>
@@ -50,7 +48,7 @@ export default function PlayScreen() {
           </>
         ) : (
           // Loading placeholder (flash of empty screen is avoided by keeping gradient visible)
-          <View style={styles.loading} />
+          <View className="flex-1" />
         )}
       </View>
 
@@ -62,15 +60,3 @@ export default function PlayScreen() {
     </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  inner: {
-    flex: 1,
-  },
-  loading: {
-    flex: 1,
-  },
-});

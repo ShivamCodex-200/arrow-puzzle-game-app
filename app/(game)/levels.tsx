@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   FlatList,
-  StyleSheet,
   StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,7 +18,6 @@ import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
 import { useProgressStore } from '../../store/useProgressStore';
-import { COLORS } from '../../constants/theme';
 
 const TOTAL_LEVELS = 200;
 const CHAPTER_SIZE = 20;
@@ -79,23 +77,23 @@ const LevelItem: React.FC<LevelItemProps> = ({
   });
 
   return (
-    <View style={styles.levelCellWrapper}>
+    <View className="w-1/4 items-center justify-center my-1.5">
       {/* Stars row above the circle */}
-      <View style={styles.starsContainer}>
+      <View className="h-3.5 justify-center mb-1">
         {isCompleted ? (
-          <View style={styles.starsRow}>
+          <View className="flex-row justify-center">
             {[1, 2, 3].map((i) => (
               <MaterialIcons
                 key={i}
                 name="star"
                 size={10}
                 color={i <= stars ? '#F59E0B' : '#E2E8F0'}
-                style={styles.starIcon}
+                className="mx-[0.5px]"
               />
             ))}
           </View>
         ) : (
-          <View style={styles.starsPlaceholder} />
+          <View className="h-3.5" />
         )}
       </View>
 
@@ -105,26 +103,25 @@ const LevelItem: React.FC<LevelItemProps> = ({
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           disabled={!isUnlocked}
-          style={[
-            styles.circleButton,
-            isCompleted && styles.circleCompleted,
-            isCurrent && styles.circleCurrent,
-            !isUnlocked && styles.circleLocked,
-          ]}
+          className={`w-[58px] h-[58px] rounded-full bg-white border-[1.5px] items-center justify-center shadow shadow-game-navy/5 elevation-2
+            ${isCompleted ? 'border-slate-200' : ''}
+            ${isCurrent ? 'border-blue-500 border-[3px]' : ''}
+            ${!isUnlocked ? 'bg-slate-100 border-slate-200 shadow-none elevation-0' : 'border-slate-200'}
+          `}
         >
           {!isUnlocked ? (
-            <View style={styles.lockedContent}>
+            <View className="items-center justify-center gap-0.5">
               <MaterialIcons name="lock" size={15} color="#94A3B8" />
-              <Text style={styles.lockedText}>{level}</Text>
+              <Text className="text-[11px] font-bold text-game-secondary">{level}</Text>
             </View>
           ) : (
-            <Text style={[styles.circleText, isCurrent && styles.currentText]}>
+            <Text className={`text-[16px] font-black ${isCurrent ? 'text-blue-500' : 'text-game-navy'}`}>
               {level}
             </Text>
           )}
 
           {isCompleted && (
-            <View style={styles.checkBadge}>
+            <View className="absolute -right-0.5 -bottom-0.5 w-[15px] h-[15px] rounded-full bg-game-success items-center justify-center border-[1.5px] border-white">
               <MaterialIcons name="check" size={8} color="#FFFFFF" />
             </View>
           )}
@@ -161,30 +158,33 @@ export default function LevelsScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View 
+      className="flex-1 bg-game-bg" 
+      style={{ paddingTop: insets.top }}
+    >
       <StatusBar barStyle="dark-content" />
 
       {/* Top Bar Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.headerIconBtn} hitSlop={8}>
+      <View className="flex-row items-center justify-between px-4 py-3">
+        <Pressable onPress={() => router.back()} className="w-10 h-10 rounded-full bg-white items-center justify-center shadow shadow-game-navy/5 elevation-2" hitSlop={8}>
           <MaterialIcons name="arrow-back" size={22} color="#1F355E" />
         </Pressable>
-        <Text style={styles.headerTitle}>Levels</Text>
-        <Pressable onPress={() => router.push('/(game)/settings')} style={styles.headerIconBtn} hitSlop={8}>
+        <Text className="text-[20px] font-black text-game-navy tracking-tight">Levels</Text>
+        <Pressable onPress={() => router.push('/(game)/settings')} className="w-10 h-10 rounded-full bg-white items-center justify-center shadow shadow-game-navy/5 elevation-2" hitSlop={8}>
           <MaterialIcons name="settings" size={22} color="#1F355E" />
         </Pressable>
       </View>
 
       {/* Progress Summary Card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryItem}>
-          <MaterialIcons name="check-circle" size={18} color="#22C55E" style={{ marginRight: 6 }} />
-          <Text style={styles.summaryLabel}>{totalCompleted} Cleared</Text>
+      <View className="bg-white rounded-[16px] px-4 py-3.5 mx-4 mb-2 flex-row items-center justify-around shadow-md shadow-game-navy/5 elevation-3">
+        <View className="flex-row items-center">
+          <MaterialIcons name="check-circle" size={18} color="#22C55E" className="mr-1.5" />
+          <Text className="text-[14px] font-extrabold text-game-navy">{totalCompleted} Cleared</Text>
         </View>
-        <View style={styles.summaryDivider} />
-        <View style={styles.summaryItem}>
-          <MaterialIcons name="star" size={18} color="#F59E0B" style={{ marginRight: 6 }} />
-          <Text style={styles.summaryLabel}>{totalStars} Stars</Text>
+        <View className="w-[1px] h-5 bg-slate-200" />
+        <View className="flex-row items-center">
+          <MaterialIcons name="star" size={18} color="#F59E0B" className="mr-1.5" />
+          <Text className="text-[14px] font-extrabold text-game-navy">{totalStars} Stars</Text>
         </View>
       </View>
 
@@ -192,18 +192,18 @@ export default function LevelsScreen() {
       <FlatList
         data={chapters}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.scrollList}
+        contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: chapter }) => (
           <Animated.View
             entering={FadeInDown.duration(400).delay(chapter.id * 40)}
-            style={styles.chapterCard}
+            className="bg-white rounded-[20px] p-4 mx-4 my-2 shadow-sm shadow-game-navy/5 elevation-2"
           >
-            <View style={styles.chapterHeader}>
-              <Text style={styles.chapterTitle}>{chapter.title}</Text>
-              <Text style={styles.chapterRange}>{chapter.rangeText}</Text>
+            <View className="flex-row justify-between items-center border-b border-game-bg pb-2 mb-2">
+              <Text className="text-[15px] font-extrabold text-game-navy">{chapter.title}</Text>
+              <Text className="text-[12px] font-bold text-game-secondary">{chapter.rangeText}</Text>
             </View>
-            <View style={styles.chapterGrid}>
+            <View className="flex-row flex-wrap">
               {chapter.levels.map((level) => {
                 const record = completedLevels[level];
                 return (
@@ -230,184 +230,3 @@ export default function LevelsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#EEF2F6', // Soft gray theme background
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#1F355E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1F355E', // Accent dark navy
-    letterSpacing: -0.3,
-  },
-  summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    shadowColor: '#1F355E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1F355E',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#E2E8F0',
-  },
-  scrollList: {
-    paddingBottom: 24,
-  },
-  chapterCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#1F355E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  chapterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEF2F6',
-    paddingBottom: 8,
-    marginBottom: 8,
-  },
-  chapterTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1F355E',
-  },
-  chapterRange: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#94A3B8',
-  },
-  chapterGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  levelCellWrapper: {
-    width: '25%', // Exactly 4 columns
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 6,
-  },
-  starsContainer: {
-    height: 14,
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  starIcon: {
-    marginHorizontal: 0.5,
-  },
-  starsPlaceholder: {
-    height: 14,
-  },
-  circleButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#1F355E',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  circleCompleted: {
-    borderColor: '#E2E8F0',
-  },
-  circleCurrent: {
-    borderColor: '#3B82F6', // Blue border
-    borderWidth: 3,
-  },
-  circleLocked: {
-    backgroundColor: '#F1F5F9', // Locked Gray background
-    borderColor: '#E2E8F0',
-    shadowOpacity: 0.01,
-    elevation: 0,
-  },
-  circleText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1F355E', // Navy
-  },
-  currentText: {
-    color: '#3B82F6', // Current Level Blue
-  },
-  lockedContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  lockedText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-  },
-  checkBadge: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 15,
-    height: 15,
-    borderRadius: 7.5,
-    backgroundColor: '#22C55E', // Success Green
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-});
