@@ -1,9 +1,45 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { MaterialIcons } from '@expo/vector-icons';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { useGameStore } from '../store/useGameStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+
+const BulbIcon = () => (
+  <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+    {/* Lightbulb head */}
+    <Path
+      d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7z"
+      fill="#FFB020"
+      stroke="#D97706"
+      strokeWidth={1.5}
+    />
+    {/* Lightbulb base thread */}
+    <Path
+      d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zM10 19h4v-1h-4v1z"
+      fill="#94A3B8"
+      stroke="#64748B"
+      strokeWidth={1.5}
+    />
+  </Svg>
+);
+
+const RulerIcon = () => (
+  <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+    {/* Purple ruler body */}
+    <Path
+      d="M5 19L19 5"
+      stroke="#8B5CF6"
+      strokeWidth={8}
+      strokeLinecap="round"
+    />
+    {/* Little white ruler ticks */}
+    <Path d="M7.5 14.5L9.5 16.5" stroke="#FFFFFF" strokeWidth={1.5} />
+    <Path d="M10.5 11.5L12.5 13.5" stroke="#FFFFFF" strokeWidth={1.5} />
+    <Path d="M13.5 8.5L15.5 10.5" stroke="#FFFFFF" strokeWidth={1.5} />
+    <Path d="M16.5 5.5L18.5 7.5" stroke="#FFFFFF" strokeWidth={1.5} />
+  </Svg>
+);
 
 export const HintButton: React.FC = () => {
   const { hints, useHint, isWon, isDeadlocked, grid, undoMove, history } = useGameStore();
@@ -15,62 +51,38 @@ export const HintButton: React.FC = () => {
     useHint();
   };
 
-  const handleEraser = () => {
-    if (history.length === 0) return;
+  const handleRuler = () => {
+    if (history.length === 0 || isWon) return;
     if (haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     undoMove();
   };
 
   const hintDisabled   = hints <= 0 || isWon;
-  const eraserDisabled = history.length === 0 || isWon;
+  const rulerDisabled  = history.length === 0 || isWon;
 
   return (
-    <View className="items-center pb-6 gap-2">
-      <View className="flex-row items-center bg-white rounded-full px-5 py-2.5 gap-6 shadow-lg shadow-[#1A2340]/10 elevation-6">
-        {/* Hint / Lightbulb */}
-        <Pressable
-          onPress={handleHint}
-          disabled={hintDisabled}
-          className={`items-center justify-center ${hintDisabled ? 'opacity-[0.35]' : ''}`}
-          hitSlop={8}
-        >
-          <View className="relative">
-            <MaterialIcons
-              name="lightbulb"
-              size={28}
-              color={hintDisabled ? "#64748B" : "#F59E0B"}
-            />
-            {hints > 0 && (
-              <View className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] rounded-full items-center justify-center px-[3px] border-[1.5px] border-white bg-amber-500">
-                <Text className="text-white text-[10px] font-black">{hints}</Text>
-              </View>
-            )}
-          </View>
-        </Pressable>
+    <View className="items-center absolute bottom-6 left-0 right-0 gap-3" pointerEvents="box-none">
+      {/* Tool 1: Hint Bulb */}
+      <Pressable
+        onPress={handleHint}
+        disabled={hintDisabled}
+        className={`w-[68px] h-[68px] rounded-full bg-white items-center justify-center shadow-lg shadow-black/12 elevation-4 ${hintDisabled ? 'opacity-40' : ''}`}
+        style={({ pressed }) => pressed ? { transform: [{ scale: 0.95 }] } : undefined}
+        hitSlop={8}
+      >
+        <View className="relative w-8 h-8 items-center justify-center">
+          <BulbIcon />
+          {hints > 0 && (
+            <View className="absolute -top-1.5 -right-1.5 bg-blue-500 rounded-full min-w-[18px] h-[18px] items-center justify-center px-1 border-[1.5px] border-white">
+              <Text className="text-white text-[9px] font-black">{hints}</Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
 
-        <View className="w-[1px] h-7 bg-slate-200" />
-
-        {/* Eraser / Undo */}
-        <Pressable
-          onPress={handleEraser}
-          disabled={eraserDisabled}
-          className={`items-center justify-center ${eraserDisabled ? 'opacity-[0.35]' : ''}`}
-          hitSlop={8}
-        >
-          <View className="relative">
-            <MaterialIcons
-              name="backspace"
-              size={26}
-              color={eraserDisabled ? "#64748B" : "#1F355E"}
-            />
-          </View>
-        </Pressable>
-      </View>
-
-      {isDeadlocked && (
-        <View className="flex-row items-center gap-1.5 bg-red-500/10 px-3.5 py-1.5 rounded-full">
-          <MaterialIcons name="block" size={14} color="#EF4444" />
-          <Text className="text-red-500 text-[12px] font-semibold">No moves left! Tap Undo or Reset.</Text>
+      {isDeadlocked && !isWon && (
+        <View className="bg-red-500/10 rounded-[16px] px-4 py-1.5">
+          <Text className="text-red-500 text-[12px] font-semibold">No moves left! Tap Reset in Settings.</Text>
         </View>
       )}
     </View>

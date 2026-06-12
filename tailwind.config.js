@@ -7,14 +7,15 @@ module.exports = {
     extend: {
       colors: {
         game: {
-          bg: '#EEF2F6',
-          navy: '#1F355E',
-          accent: '#4CAF50',
+          bg: '#EDF3FA',
+          navy: '#17243A',
+          accent: '#FF5A3D',
           success: '#22C55E',
           secondary: '#64748B',
           danger: '#EF4444',
           warning: '#F59E0B',
-          dot: '#C2C7D0',
+          dot: '#D8DDE5',
+          badgeBg: '#E9EEF5',
         },
       },
     },

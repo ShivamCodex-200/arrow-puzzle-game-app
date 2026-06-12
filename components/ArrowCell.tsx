@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
@@ -9,6 +9,7 @@ import Animated, {
   useSharedValue,
   withSequence,
   withTiming,
+  withDelay,
 } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { COLORS } from "../constants/theme";
@@ -32,7 +33,7 @@ interface Props {
   svgHeight: number;
 }
 
-export const ArrowCell: React.FC<Props> = ({
+const ArrowCellComponent: React.FC<Props> = ({
   arrow,
   cellSize,
   cellGap,
@@ -53,28 +54,32 @@ export const ArrowCell: React.FC<Props> = ({
   const prevRemovedRef = useRef(false);
   const prevIdRef = useRef<string | undefined>(undefined);
 
-  // ── 1. Calculate the full coordinate path (including exit extension) ─────
-  const basePixels = arrow.cells.map((cell) => ({
-    x: cell.x * (cellSize + cellGap) + cellSize / 2 + padding,
-    y: cell.y * (cellSize + cellGap) + cellSize / 2 + padding,
-  }));
-
-  const fullPoints: Point[] = [...basePixels];
-  const headPixel = basePixels[basePixels.length - 1];
-  const stepDist = cellSize + cellGap;
+  const OVERSHOOT_CELLS = 15;
   const dir = arrow.direction;
 
-  // Extend the path straight off-screen by N cells so the tail can exit fully
-  const OVERSHOOT_CELLS = 15;
-  for (let i = 1; i <= arrow.cells.length + OVERSHOOT_CELLS; i++) {
-    let px = headPixel.x;
-    let py = headPixel.y;
-    if (dir === "right") px += i * stepDist;
-    else if (dir === "left") px -= i * stepDist;
-    else if (dir === "down") py += i * stepDist;
-    else py -= i * stepDist;
-    fullPoints.push({ x: px, y: py });
-  }
+  // ── 1. Memoize basePixels and fullPoints coordinate calculations ─────
+  const { basePixels, fullPoints } = useMemo(() => {
+    const base = arrow.cells.map((cell) => ({
+      x: cell.x * (cellSize + cellGap) + cellSize / 2 + padding,
+      y: cell.y * (cellSize + cellGap) + cellSize / 2 + padding,
+    }));
+
+    const full: Point[] = [...base];
+    const head = base[base.length - 1];
+    const stepDist = cellSize + cellGap;
+
+    for (let i = 1; i <= arrow.cells.length + OVERSHOOT_CELLS; i++) {
+      let px = head.x;
+      let py = head.y;
+      if (arrow.direction === "right") px += i * stepDist;
+      else if (arrow.direction === "left") px -= i * stepDist;
+      else if (arrow.direction === "down") py += i * stepDist;
+      else py -= i * stepDist;
+      full.push({ x: px, y: py });
+    }
+
+    return { basePixels: base, fullPoints: full };
+  }, [arrow.cells, arrow.direction, cellSize, cellGap, padding]);
 
   // ── Reset values when arrow ID changes (new level loaded) ───────────────
   useEffect(() => {
@@ -93,24 +98,27 @@ export const ArrowCell: React.FC<Props> = ({
       prevRemovedRef.current = true;
 
       const totalDistance = arrow.cells.length + OVERSHOOT_CELLS;
-      const animDuration = totalDistance * 35; // 35ms per cell speed
+      const animDuration = 300; // 300ms slide duration
 
-      // Crawl forward by cells.length + OVERSHOOT_CELLS units (extend far outside the board area)
-      progress.value = withTiming(
-        totalDistance,
-        { duration: animDuration, easing: Easing.linear },
-        (finished) => {
-          if (finished) {
-            runOnJS(onEscapeComplete)();
-          }
-        },
+      // Wait 100ms during color transition, then slide out
+      progress.value = withDelay(
+        100,
+        withTiming(
+          totalDistance,
+          { duration: animDuration, easing: Easing.bezier(0.25, 0.1, 0.25, 1) },
+          (finished) => {
+            if (finished) {
+              runOnJS(onEscapeComplete)();
+            }
+          },
+        )
       );
     }
   }, [arrow.isRemoved]);
 
   // ── Selection Highlight Animation ─────────────────────────────────────
   useEffect(() => {
-    isSelectedVal.value = withTiming(isSelected ? 1 : 0, { duration: 120 });
+    isSelectedVal.value = withTiming(isSelected ? 1 : 0, { duration: 100 });
   }, [isSelected]);
 
   // ── Shake animation when blocked ──────────────────────────────────────────
@@ -138,7 +146,7 @@ export const ArrowCell: React.FC<Props> = ({
 
     // Interpolate stroke color dynamically
     const defaultColor = isHint ? COLORS.arrowHint : COLORS.arrowNormal;
-    const selectedColor = "#3B82F6"; // bright blue
+    const selectedColor = COLORS.arrowHighlight; // orange-red
     const stroke = interpolateColor(isSelectedVal.value, [0, 1], [defaultColor, selectedColor]);
 
     if (p >= len + 15.0) {
@@ -186,11 +194,11 @@ export const ArrowCell: React.FC<Props> = ({
 
     // Interpolate stroke color dynamically
     const defaultColor = isHint ? COLORS.arrowHint : COLORS.arrowNormal;
-    const selectedColor = "#3B82F6"; // bright blue
+    const selectedColor = COLORS.arrowHighlight; // orange-red
     const stroke = interpolateColor(isSelectedVal.value, [0, 1], [defaultColor, selectedColor]);
 
     if (p >= len + 15.0) {
-      return { d: "M 0 0", stroke: "transparent" };
+      return { d: "M 0 0", stroke: "transparent", fill: "transparent" };
     }
 
     const t_end = len - 1 + p;
@@ -207,20 +215,21 @@ export const ArrowCell: React.FC<Props> = ({
     };
 
     const ptEnd = getPoint(t_end);
-    const headSize = 6; // slightly smaller arrowheads
+    const headLength = Math.max(5, cellSize * 0.45);
+    const headWidth = Math.max(3, cellSize * 0.25);
 
     let headD = "";
     if (dir === "right") {
-      headD = `M ${ptEnd.x - headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x - headSize} ${ptEnd.y + headSize}`;
+      headD = `M ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x - headLength} ${ptEnd.y - headWidth} L ${ptEnd.x - headLength} ${ptEnd.y + headWidth} Z`;
     } else if (dir === "left") {
-      headD = `M ${ptEnd.x + headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y + headSize}`;
+      headD = `M ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headLength} ${ptEnd.y - headWidth} L ${ptEnd.x + headLength} ${ptEnd.y + headWidth} Z`;
     } else if (dir === "up") {
-      headD = `M ${ptEnd.x - headSize} ${ptEnd.y + headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y + headSize}`;
+      headD = `M ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x - headWidth} ${ptEnd.y + headLength} L ${ptEnd.x + headWidth} ${ptEnd.y + headLength} Z`;
     } else if (dir === "down") {
-      headD = `M ${ptEnd.x - headSize} ${ptEnd.y - headSize} L ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x + headSize} ${ptEnd.y - headSize}`;
+      headD = `M ${ptEnd.x} ${ptEnd.y} L ${ptEnd.x - headWidth} ${ptEnd.y - headLength} L ${ptEnd.x + headWidth} ${ptEnd.y - headLength} Z`;
     }
 
-    return { d: headD, stroke };
+    return { d: headD, stroke, fill: stroke };
   });
 
   // ── Shake translation style ───────────────────────────────────────────────
@@ -229,6 +238,7 @@ export const ArrowCell: React.FC<Props> = ({
   }));
 
   const occupiedCells = getOccupiedCells(arrow);
+  const scaledStrokeWidth = Math.max(1.8, cellSize * 0.25);
 
   return (
     <View style={[StyleSheet.absoluteFill, { overflow: 'visible' }]} pointerEvents="box-none">
@@ -246,7 +256,7 @@ export const ArrowCell: React.FC<Props> = ({
           {/* Animated Stem */}
           <AnimatedPath
             animatedProps={animatedStemProps}
-            strokeWidth={7}
+            strokeWidth={scaledStrokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
@@ -254,10 +264,9 @@ export const ArrowCell: React.FC<Props> = ({
           {/* Animated Arrowhead */}
           <AnimatedPath
             animatedProps={animatedHeadProps}
-            strokeWidth={7}
+            strokeWidth={scaledStrokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
-            fill="none"
           />
         </Svg>
       </Animated.View>
@@ -287,6 +296,22 @@ export const ArrowCell: React.FC<Props> = ({
     </View>
   );
 };
+
+export const ArrowCell = React.memo(ArrowCellComponent, (prev, next) => {
+  return (
+    prev.arrow.id === next.arrow.id &&
+    prev.arrow.isRemoved === next.arrow.isRemoved &&
+    prev.arrow.direction === next.arrow.direction &&
+    prev.cellSize === next.cellSize &&
+    prev.cellGap === next.cellGap &&
+    prev.padding === next.padding &&
+    prev.isHint === next.isHint &&
+    prev.isSelected === next.isSelected &&
+    prev.triggerShake === next.triggerShake &&
+    prev.svgWidth === next.svgWidth &&
+    prev.svgHeight === next.svgHeight
+  );
+});
 
 const styles = StyleSheet.create({
   tapCell: {

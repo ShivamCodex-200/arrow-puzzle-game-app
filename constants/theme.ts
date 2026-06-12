@@ -1,8 +1,8 @@
 // Light theme colors (matching the original game's visual style)
 export const COLORS = {
   // Backgrounds
-  bgGradientStart: '#EBF0F5',
-  bgGradientEnd:   '#EBF0F5',
+  bgGradientStart: '#EDF3FA',
+  bgGradientEnd:   '#EDF3FA',
 
   // Card (arrow cell)
   cardBg:          '#FFFFFF',
@@ -11,16 +11,21 @@ export const COLORS = {
   cardBgRemoved:   'transparent',
 
   // Arrow icons
-  arrowNormal:     '#1F355E',
-  arrowEscapable:  '#1F355E',
+  arrowNormal:     '#17243A', // dark navy
+  arrowEscapable:  '#17243A',
   arrowHint:       '#22C55E',
+  arrowHighlight:  '#FF5A3D', // orange-red highlight
 
   // Borders
   borderEscapable: 'transparent',
   borderHint:      '#22C55E',
 
   // Empty dot
-  dot:             '#C2C7D0',
+  dot:             '#A5B1C2',
+
+  // Badge/Pill Background & Text
+  badgeBg:         '#E9EEF5',
+  badgeText:       '#17243A',
 
   // UI
   surface:         '#FFFFFF',

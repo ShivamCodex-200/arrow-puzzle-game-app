@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -39,23 +39,50 @@ export const GameGrid: React.FC = () => {
 
   if (!grid) return null;
 
-  const cellSize = getCellSize(SCREEN_WIDTH, grid.cols);
+  // Calculate board size dynamically to occupy up to 80% width and 65% height
+  const maxW = SCREEN_WIDTH * 0.80;
+  const maxH = SCREEN_HEIGHT * 0.65;
+  const maxCellWidth = Math.floor((maxW - (CELL_GAP * (grid.cols - 1))) / grid.cols);
+  const maxCellHeight = Math.floor((maxH - (CELL_GAP * (grid.rows - 1))) / grid.rows);
+  const cellSize = Math.min(maxCellWidth, maxCellHeight);
+
   const boardWidth =
     cellSize * grid.cols + CELL_GAP * (grid.cols - 1) + GRID_PADDING * 2;
   const boardHeight =
     cellSize * grid.rows + CELL_GAP * (grid.rows - 1) + GRID_PADDING * 2;
 
-  // Layer 1: Build a list of dot positions based on shape mask (if present)
-  const dots: { x: number; y: number }[] = [];
-  for (let r = 0; r < grid.rows; r++) {
-    for (let c = 0; c < grid.cols; c++) {
-      if (!grid.shapeMask || grid.shapeMask[r]?.[c]) {
+  // Layer 1: Build a list of dot positions across the entire grid (visible in empty spaces)
+  const dots = useMemo(() => {
+    const pts: { x: number; y: number }[] = [];
+    for (let r = 0; r < grid.rows; r++) {
+      for (let c = 0; c < grid.cols; c++) {
         const cx = c * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING;
         const cy = r * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING;
-        dots.push({ x: cx, y: cy });
+        pts.push({ x: cx, y: cy });
       }
     }
-  }
+    return pts;
+  }, [grid.rows, grid.cols, cellSize]);
+
+  // Memoize static background SVG dot grid to prevent redraws on gameplay interactions
+  const dotGridSvg = useMemo(() => (
+    <Svg
+      width={boardWidth}
+      height={boardHeight}
+      style={StyleSheet.absoluteFill}
+    >
+      {dots.map((dot, index) => (
+        <Circle
+          key={index}
+          cx={dot.x}
+          cy={dot.y}
+          r={1.5}
+          fill={COLORS.dot}
+          opacity={0.8}
+        />
+      ))}
+    </Svg>
+  ), [boardWidth, boardHeight, dots]);
 
   // RNGH v2 Gestures
   const pinchGesture = Gesture.Pinch()
@@ -120,22 +147,7 @@ export const GameGrid: React.FC = () => {
           ]}
         >
           {/* Layer 1: Static Background Dot Grid (Drawn in background, covered by arrows) */}
-          <Svg
-            width={boardWidth}
-            height={boardHeight}
-            style={StyleSheet.absoluteFill}
-          >
-            {dots.map((dot, index) => (
-              <Circle
-                key={index}
-                cx={dot.x}
-                cy={dot.y}
-                r={3.5}
-                fill={COLORS.dot}
-                opacity={0.8}
-              />
-            ))}
-          </Svg>
+          {dotGridSvg}
 
           {/* Layer 2: SVG Arrows and Interaction Targets */}
           {grid.arrows.map((arrow) => {

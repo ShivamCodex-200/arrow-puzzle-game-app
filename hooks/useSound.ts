@@ -1,5 +1,9 @@
-import { useAudioPlayer } from 'expo-audio';
+import { createAudioPlayer } from 'expo-audio';
 import { useSettingsStore } from '../store/useSettingsStore';
+
+// Preload the tap sound effect as a global singleton.
+// This ensures the audio file is loaded exactly once on startup and reused across all screens/components.
+const tapPlayer = createAudioPlayer(require('../assets/arrow_click_sound_effect.wav'));
 
 /**
  * Hook for playing game sound effects.
@@ -7,8 +11,6 @@ import { useSettingsStore } from '../store/useSettingsStore';
  */
 export function useSound() {
   const { sounds } = useSettingsStore();
-
-  const tapPlayer = useAudioPlayer(require('../assets/arrow_click_sound_effect.wav'));
 
   const playTap = async () => {
     if (!sounds) return;

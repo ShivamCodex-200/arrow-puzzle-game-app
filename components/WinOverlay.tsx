@@ -20,25 +20,64 @@ const { width: W, height: H } = Dimensions.get('window');
 const CONFETTI_COLORS = ['#F87171', '#60A5FA', '#34D399', '#FBBF24', '#A78BFA', '#F472B6'];
 
 const Particle = ({ index }: { index: number }) => {
-  const color  = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
-  const size   = 6 + (index % 5) * 2;
-  const startX = (W / 40) * index;
-  const drift  = (index % 2 === 0 ? 1 : -1) * (20 + (index % 4) * 25);
+  const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length];
+  const size = 6 + (index % 5) * 2;
 
-  const y = useSharedValue(-20);
+  const isLeft = index % 2 === 0;
+  // Start at the bottom corners
+  const startX = isLeft ? -10 : W + 10;
+  const startY = H + 10;
+
+  const y = useSharedValue(startY);
   const x = useSharedValue(startX);
   const r = useSharedValue(0);
   const o = useSharedValue(1);
 
   useEffect(() => {
-    const delay    = (index % 20) * 70;
-    const duration = 1800 + (index % 8) * 250;
+    const delay = (index % 15) * 35; // Staggers the shots nicely
+    const shootUpDuration = 600 + (index % 4) * 80;
+    const fallDownDuration = 1200 + (index % 4) * 120;
 
-    y.value = withDelay(delay, withTiming(H + 20, { duration, easing: Easing.linear }));
-    x.value = withDelay(delay, withTiming(startX + drift, { duration }));
-    r.value = withDelay(delay, withRepeat(withTiming(360, { duration: 700, easing: Easing.linear }), -1));
-    o.value = withDelay(delay + duration * 0.65, withTiming(0, { duration: duration * 0.35 }));
-  }, []);
+    // Peak coordinates
+    const peakY = H * (0.15 + (index % 6) * 0.05); // Peak height in upper 15%-45% of the screen
+    const peakX = isLeft 
+      ? (W * 0.15) + (index % 8) * (W * 0.08)  // Travel towards center-right
+      : (W * 0.85) - (index % 8) * (W * 0.08); // Travel towards center-left
+
+    // End coordinates
+    const endX = peakX + (isLeft ? 30 + (index % 3) * 20 : -30 - (index % 3) * 20);
+    const endY = H + 20;
+
+    // Animate X
+    x.value = withDelay(
+      delay,
+      withSequence(
+        withTiming(peakX, { duration: shootUpDuration, easing: Easing.out(Easing.quad) }),
+        withTiming(endX, { duration: fallDownDuration, easing: Easing.linear })
+      )
+    );
+
+    // Animate Y
+    y.value = withDelay(
+      delay,
+      withSequence(
+        withTiming(peakY, { duration: shootUpDuration, easing: Easing.out(Easing.quad) }),
+        withTiming(endY, { duration: fallDownDuration, easing: Easing.in(Easing.quad) })
+      )
+    );
+
+    // Spin rapidly
+    r.value = withDelay(
+      delay,
+      withRepeat(withTiming(360, { duration: 600, easing: Easing.linear }), -1)
+    );
+
+    // Fade out during falling stage
+    o.value = withDelay(
+      delay + shootUpDuration + fallDownDuration * 0.5,
+      withTiming(0, { duration: fallDownDuration * 0.5 })
+    );
+  }, [index]);
 
   const style = useAnimatedStyle(() => ({
     width:           size,
@@ -67,7 +106,7 @@ export const WinOverlay: React.FC = () => {
     if (isWon) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       opBg.value   = withTiming(1, { duration: 300 });
-      scale.value  = withDelay(100, withSpring(1, { damping: 14, stiffness: 130 }));
+      scale.value  = withDelay(100, withSpring(1, { damping: 20, stiffness: 120, overshootClamping: true }));
       opCard.value = withDelay(100, withTiming(1, { duration: 300 }));
     } else {
       scale.value  = 0.6;
@@ -98,7 +137,7 @@ export const WinOverlay: React.FC = () => {
 
       {/* Confetti */}
       <View className="absolute inset-0" pointerEvents="none">
-        {Array.from({ length: 45 }).map((_, i) => <Particle key={i} index={i} />)}
+        {Array.from({ length: 65 }).map((_, i) => <Particle key={i} index={i} />)}
       </View>
 
       {/* Card */}

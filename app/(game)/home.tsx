@@ -213,14 +213,22 @@ export default function HomeScreen() {
               </ScalePressable>
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.duration(600).delay(550)}>
+            <Animated.View entering={FadeInDown.duration(600).delay(525)}>
               <ScalePressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(game)/play',
-                    params: { level: '999' },
-                  })
-                }
+                onPress={() => router.push('/(game)/escape-mode')}
+                className="bg-white rounded-[16px] px-[18px] py-[15px] flex-row items-center justify-between shadow-sm shadow-game-navy/5 elevation-2"
+              >
+                <View className="flex-row items-center gap-3">
+                  <Text className="text-[18px]">🧩</Text>
+                  <Text className="text-[15px] font-bold text-game-navy">Escape Mode</Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color="#94A3B8" />
+              </ScalePressable>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.duration(600).delay(600)}>
+              <ScalePressable
+                onPress={() => router.push('/(game)/daily-challenge')}
                 className="bg-white rounded-[16px] px-[18px] py-[15px] flex-row items-center justify-between shadow-sm shadow-game-navy/5 elevation-2"
               >
                 <View className="flex-row items-center gap-3">
@@ -231,7 +239,7 @@ export default function HomeScreen() {
               </ScalePressable>
             </Animated.View>
 
-            <Animated.View entering={FadeInDown.duration(600).delay(650)}>
+            <Animated.View entering={FadeInDown.duration(600).delay(675)}>
               <ScalePressable
                 onPress={() => router.push('/(game)/settings')}
                 className="bg-white rounded-[16px] px-[18px] py-[15px] flex-row items-center justify-between shadow-sm shadow-game-navy/5 elevation-2"

@@ -24,7 +24,7 @@ export const GameOverOverlay: React.FC = () => {
     if (isGameOver) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       opBg.value   = withTiming(1, { duration: 300 });
-      scale.value  = withDelay(100, withSpring(1, { damping: 14, stiffness: 130 }));
+      scale.value  = withDelay(100, withSpring(1, { damping: 20, stiffness: 120, overshootClamping: true }));
       opCard.value = withDelay(100, withTiming(1, { duration: 300 }));
     } else {
       scale.value  = 0.6;

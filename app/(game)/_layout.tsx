@@ -7,6 +7,8 @@ export default function GameLayout() {
       <Stack.Screen name="levels" />
       <Stack.Screen name="play" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="escape-mode" />
+      <Stack.Screen name="daily-challenge" />
     </Stack>
   );
 }
