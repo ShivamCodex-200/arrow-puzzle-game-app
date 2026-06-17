@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, LinearGradient as SvgGradient, Stop, Defs } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -22,6 +22,24 @@ import { useDailyChallengeStore } from '../../store/useDailyChallengeStore';
 import { generateDailyChallenge } from '../../engine/dailyChallengeGenerator';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const CANVAS_SIZE = 2400;
+
+const getDynamicCellSize = (cols: number, rows: number) => {
+  const maxDim = Math.max(cols, rows);
+  if (maxDim <= 6) return 60;
+  if (maxDim <= 10) return 55;
+  if (maxDim <= 15) return 50;
+  if (maxDim <= 20) return 45;
+  return 40;
+};
+
+const styles = StyleSheet.create({
+  board: {
+    backgroundColor: "transparent",
+    overflow: "visible",
+  },
+});
 
 // ── CUSTOM VECTOR TROPHY COMPONENT ───────────────────────────────────────────
 const SvgTrophy = () => (
@@ -128,11 +146,11 @@ export default function DailyChallengeScreen() {
     lives,
     isWon,
     isGameOver,
-    selectedArrowId,
-    shakingArrowId,
+    selectedGroupId,
+    shakingGroupId,
     timeElapsed,
-    tapArrow,
-    removeArrowState,
+    tapGroup,
+    removeGroupState,
     handleShakeDone,
     resetChallenge,
   } = useDailyChallenge(selectedDateStr);
@@ -172,47 +190,42 @@ export default function DailyChallengeScreen() {
   }, []);
 
   // Responsive Board calculations
-  const { cellSize, boardWidth, boardHeight } = useMemo(() => {
-    if (!grid) return { cellSize: 30, boardWidth: 0, boardHeight: 0 };
+  const { cellSize, boardWidth, boardHeight, gridOffsetX, gridOffsetY } = useMemo(() => {
+    if (!grid) return { cellSize: 30, boardWidth: 0, boardHeight: 0, gridOffsetX: 0, gridOffsetY: 0 };
     
-    // We want the total board width to fit within 94% of the screen width,
-    // and total height within 60% of the screen height.
-    const maxW = SCREEN_WIDTH * 0.94;
-    const maxH = SCREEN_HEIGHT * 0.60;
+    const size = getDynamicCellSize(grid.cols, grid.rows);
+    const w = size * grid.cols + CELL_GAP * (grid.cols - 1) + GRID_PADDING * 2;
+    const h = size * grid.rows + CELL_GAP * (grid.rows - 1) + GRID_PADDING * 2;
 
-    const maxCellWidth = (maxW - (CELL_GAP * (grid.cols - 1)) - (GRID_PADDING * 2)) / grid.cols;
-    const maxCellHeight = (maxH - (CELL_GAP * (grid.rows - 1)) - (GRID_PADDING * 2)) / grid.rows;
-    
-    const size = Math.floor(Math.min(maxCellWidth, maxCellHeight));
-    const finalSize = Math.max(8, size); // lower safety cap for very dense grids
+    const offsetX = (CANVAS_SIZE - w) / 2;
+    const offsetY = (CANVAS_SIZE - h) / 2;
 
-    const w = finalSize * grid.cols + CELL_GAP * (grid.cols - 1) + GRID_PADDING * 2;
-    const h = finalSize * grid.rows + CELL_GAP * (grid.rows - 1) + GRID_PADDING * 2;
-
-    return { cellSize: finalSize, boardWidth: w, boardHeight: h };
+    return { cellSize: size, boardWidth: w, boardHeight: h, gridOffsetX: offsetX, gridOffsetY: offsetY };
   }, [grid]);
 
   // Static dots underneath arrows (visible in empty spaces)
   const dots = useMemo(() => {
     if (!grid) return [];
-    const pts: { x: number; y: number }[] = [];
+    const pts: { x: number; y: number; col: number; row: number }[] = [];
     for (let r = 0; r < grid.rows; r++) {
       for (let c = 0; c < grid.cols; c++) {
-        const cx = c * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING;
-        const cy = r * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING;
-        pts.push({ x: cx, y: cy });
+        if (grid.shapeMask[r][c]) {
+          const cx = c * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING + gridOffsetX;
+          const cy = r * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING + gridOffsetY;
+          pts.push({ x: cx, y: cy, col: c, row: r });
+        }
       }
     }
     return pts;
-  }, [grid, cellSize]);
+  }, [grid, cellSize, gridOffsetX, gridOffsetY]);
 
-  // Memoize static background SVG dot grid to prevent redraws on gameplay interactions
+  // Static dot grid — depends only on grid structure (not per-tap state)
   const dotGridSvg = useMemo(() => {
     if (!grid || dots.length === 0) return null;
     return (
       <Svg
-        width={boardWidth}
-        height={boardHeight}
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
         style={StyleSheet.absoluteFill}
       >
         {dots.map((dot, index) => (
@@ -220,21 +233,108 @@ export default function DailyChallengeScreen() {
             key={index}
             cx={dot.x}
             cy={dot.y}
-            r={1.5}
+            r={2.8}
             fill={COLORS.dot}
-            opacity={0.8}
+            opacity={0.75}
           />
         ))}
       </Svg>
     );
-  }, [boardWidth, boardHeight, dots, grid]);
+  }, [dots, grid]);
+
+
+  const [viewportSize, setViewportSize] = useState({
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT - 200,
+  });
+
+  const onViewportLayout = useCallback((event: any) => {
+    const { width, height } = event.nativeEvent.layout;
+    setViewportSize({ width, height });
+  }, []);
+
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  // Center camera whenever level loads or viewport changes
+  useEffect(() => {
+    if (!grid) return;
+    const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
+    const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
+
+    scale.value = 1;
+    savedScale.value = 1;
+    translateX.value = initX;
+    translateY.value = initY;
+    savedTranslateX.value = initX;
+    savedTranslateY.value = initY;
+  }, [grid?.levelNumber, grid?.seed, viewportSize.width, viewportSize.height]);
+
+  // RNGH v2 Gestures
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.max(0.8, Math.min(3, savedScale.value * e.scale));
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+    });
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      const tx = savedTranslateX.value + e.translationX;
+      const ty = savedTranslateY.value + e.translationY;
+
+      // Limit drag distance to avoid losing the board entirely
+      const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
+      const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
+      const limitX = 800 * scale.value;
+      const limitY = 800 * scale.value;
+
+      translateX.value = Math.max(initX - limitX, Math.min(initX + limitX, tx));
+      translateY.value = Math.max(initY - limitY, Math.min(initY + limitY, ty));
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+      savedScale.value = scale.value;
+    });
+
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onStart(() => {
+      const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
+      const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
+      scale.value = withTiming(1);
+      translateX.value = withTiming(initX);
+      translateY.value = withTiming(initY);
+      savedScale.value = 1;
+      savedTranslateX.value = initX;
+      savedTranslateY.value = initY;
+    });
+
+  const gesture = Gesture.Simultaneous(
+    Gesture.Simultaneous(pinchGesture, panGesture),
+    doubleTapGesture
+  );
+
+  const animatedBoardStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
 
   const activeChallengeInfo = useMemo(() => {
     return generateDailyChallenge(selectedDateStr);
   }, [selectedDateStr]);
 
   const remainingCount = useMemo(() => {
-    return grid ? grid.arrows.filter((a) => !a.isRemoved).length : 0;
+    return grid ? Object.values(grid.groups).filter((g) => !g.isRemoved).length : 0;
   }, [grid]);
 
   const formatTime = (secs: number) => {
@@ -258,7 +358,7 @@ export default function DailyChallengeScreen() {
   }));
 
   return (
-    <GestureHandlerRootView className="flex-1 bg-white">
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
       <StatusBar barStyle="light-content" />
 
       {screenMode === 'calendar' ? (
@@ -505,42 +605,53 @@ export default function DailyChallengeScreen() {
           </View>
 
           {/* Responsive Centered Game Board Viewport */}
-          <View className="flex-1 items-center justify-center overflow-visible">
-            {grid && (
-              <View 
-                style={{ width: boardWidth, height: boardHeight, position: 'relative', overflow: 'visible' }}
-              >
-                {/* Layer 1: Background Dot Grid */}
-                {dotGridSvg}
+          <View 
+            className="flex-1 overflow-hidden relative" 
+            onLayout={onViewportLayout}
+          >
+            <GestureDetector gesture={gesture}>
+              <View style={StyleSheet.absoluteFill} collapsable={false}>
+                {grid && (
+                  <Animated.View 
+                    style={[
+                      styles.board,
+                      { width: CANVAS_SIZE, height: CANVAS_SIZE },
+                      animatedBoardStyle,
+                    ]}
+                  >
+                    {/* Layer 1: Background Dot Grid */}
+                    {dotGridSvg}
 
-                {/* Layer 2: Vector Sliding Arrows */}
-                {grid.arrows.map((arrow) => {
-                  const handleTap = () => {
-                    tapArrow(arrow.id);
-                  };
+                    {/* Layer 2: Vector Sliding Arrows */}
+                    {grid.cells && Object.values(grid.cells).map((cell) => {
+                      const handleTap = () => {
+                        tapGroup(cell.groupId);
+                      };
 
-                  return (
-                    <ArrowCell
-                      key={arrow.id}
-                      arrow={arrow}
-                      cellSize={cellSize}
-                      cellGap={CELL_GAP}
-                      padding={GRID_PADDING}
-                      isHint={false}
-                      isSelected={selectedArrowId === arrow.id}
-                      onTap={handleTap}
-                      onEscapeComplete={() => {
-                        removeArrowState(arrow.id);
-                      }}
-                      triggerShake={shakingArrowId === arrow.id}
-                      onShakeDone={() => handleShakeDone(arrow.id)}
-                      svgWidth={boardWidth}
-                      svgHeight={boardHeight}
-                    />
-                  );
-                })}
+                      return (
+                        <ArrowCell
+                          key={cell.id}
+                          cell={cell}
+                          cellSize={cellSize}
+                          cellGap={CELL_GAP}
+                          padding={GRID_PADDING}
+                          isHint={false}
+                          isSelected={selectedGroupId === cell.groupId}
+                          onTap={handleTap}
+                          onEscapeComplete={() => {
+                            removeGroupState(cell.groupId);
+                          }}
+                          triggerShake={shakingGroupId === cell.groupId}
+                          onShakeDone={() => handleShakeDone(cell.groupId)}
+                          offsetX={gridOffsetX}
+                          offsetY={gridOffsetY}
+                        />
+                      );
+                    })}
+                  </Animated.View>
+                )}
               </View>
-            )}
+            </GestureDetector>
           </View>
 
           {/* Bottom Tools Row */}
@@ -630,6 +741,6 @@ export default function DailyChallengeScreen() {
           )}
         </View>
       )}
-    </GestureHandlerRootView>
+    </View>
   );
 }

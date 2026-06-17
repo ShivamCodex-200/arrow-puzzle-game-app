@@ -1,38 +1,81 @@
-import { canEscape } from "./canEscape";
+/**
+ * engine/escapeArrow.ts
+ *
+ * Handle group escaping, checking win conditions, and detecting deadlock conditions.
+ */
+
+import { canGroupEscape } from "./canEscape";
 import type { GridState } from "./types";
 
 /**
- * Returns a new GridState with the arrow marked as isRemoved: true.
- * Does not mutate the original.
+ * Returns a new GridState where the specified group is marked as isRemoving (sliding out).
+ * This starts the animation.
  */
-export function escapeArrow(grid: GridState, arrowId: string): GridState {
-  const newArrows = grid.arrows.map((a) =>
-    a.id === arrowId ? { ...a, isRemoved: true } : a,
-  );
+export function startRemovingGroup(grid: GridState, groupId: string): GridState {
+  const group = grid.groups[groupId];
+  if (!group || group.isRemoved || group.isRemoving) return grid;
+
+  const newGroups = { ...grid.groups };
+  newGroups[groupId] = {
+    ...group,
+    isRemoving: true,
+  };
 
   return {
     ...grid,
-    arrows: newArrows,
-    removedCount: grid.removedCount + 1,
+    groups: newGroups,
   };
 }
 
 /**
- * Returns true if all arrows on the board have escaped.
+ * Returns a new GridState with the group and all its cells marked as fully removed.
+ * Called once the slide-out animation finishes.
  */
-export function checkWin(grid: GridState): boolean {
-  return grid.removedCount === grid.totalArrows;
+export function escapeGroup(grid: GridState, groupId: string): GridState {
+  const group = grid.groups[groupId];
+  if (!group) return grid;
+
+  const newGroups = { ...grid.groups };
+  newGroups[groupId] = {
+    ...group,
+    isRemoved: true,
+    isRemoving: false,
+  };
+
+  const newCells = { ...grid.cells };
+  for (const cid of group.cellIds) {
+    if (newCells[cid]) {
+      newCells[cid] = {
+        ...newCells[cid],
+        isRemoved: true,
+      };
+    }
+  }
+
+  return {
+    ...grid,
+    cells: newCells,
+    groups: newGroups,
+    removedGroups: grid.removedGroups + 1,
+  };
 }
 
 /**
- * Returns true if there are remaining arrows but none of them can escape.
+ * Returns true if all groups on the board have escaped.
+ */
+export function checkWin(grid: GridState): boolean {
+  return grid.removedGroups === grid.totalGroups;
+}
+
+/**
+ * Returns true if there are remaining groups but none of them can escape.
  */
 export function isDeadlock(grid: GridState): boolean {
-  if (grid.removedCount === grid.totalArrows) return false;
+  if (grid.removedGroups === grid.totalGroups) return false;
 
-  for (const a of grid.arrows) {
-    if (!a.isRemoved && canEscape(grid, a.id)) {
-      return false; // at least one can escape
+  for (const group of Object.values(grid.groups)) {
+    if (!group.isRemoved && !group.isRemoving && canGroupEscape(grid, group.id)) {
+      return false; // at least one group can escape
     }
   }
 

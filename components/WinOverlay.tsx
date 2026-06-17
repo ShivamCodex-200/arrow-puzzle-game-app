@@ -123,7 +123,7 @@ export const WinOverlay: React.FC = () => {
 
   if (!isWon || !grid) return null;
 
-  const total = grid.totalArrows;
+  const total = grid.totalGroups;
   const stars = moves <= total ? 3 : moves <= Math.floor(total * 1.5) ? 2 : 1;
 
   const handleNext = () => {

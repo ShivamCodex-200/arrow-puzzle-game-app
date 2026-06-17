@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -8,22 +8,49 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
-import { CELL_GAP, getCellSize, GRID_PADDING } from "../constants/config";
+import { CELL_GAP, GRID_PADDING } from "../constants/config";
 import { COLORS } from "../constants/theme";
+import { useSound } from "../hooks/useSound";
 import { useGameStore } from "../store/useGameStore";
 import { useSettingsStore } from "../store/useSettingsStore";
-import { useSound } from "../hooks/useSound";
 import { ArrowCell } from "./ArrowCell";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
+const CANVAS_SIZE = 2400;
+
+const getDynamicCellSize = (cols: number, rows: number) => {
+  const maxDim = Math.max(cols, rows);
+  if (maxDim <= 6) return 60;
+  if (maxDim <= 10) return 55;
+  if (maxDim <= 15) return 50;
+  if (maxDim <= 20) return 45;
+  return 40;
+};
+
 export const GameGrid: React.FC = () => {
-  const { grid, tapArrow, removeArrowState, hintCellIds, isWon, selectedArrowId } =
-    useGameStore();
+  const {
+    grid,
+    tapGroup,
+    removeGroupState,
+    hintGroupIds,
+    isWon,
+    selectedGroupId,
+  } = useGameStore();
   const { haptics } = useSettingsStore();
   const { playTap } = useSound();
 
-  const [shakingArrowId, setShakingArrowId] = useState<string | null>(null);
+  const [shakingGroupId, setShakingGroupId] = useState<string | null>(null);
+
+  const [viewportSize, setViewportSize] = useState({
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT - 200,
+  });
+
+  const onViewportLayout = useCallback((event: any) => {
+    const { width, height } = event.nativeEvent.layout;
+    setViewportSize({ width, height });
+  }, []);
 
   // Zoom and Pan Shared Values
   const scale = useSharedValue(1);
@@ -33,61 +60,94 @@ export const GameGrid: React.FC = () => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  const handleShakeDone = useCallback((arrowId: string) => {
-    setShakingArrowId((prev) => (prev === arrowId ? null : prev));
+  const handleShakeDone = useCallback((groupId: string) => {
+    setShakingGroupId((prev) => (prev === groupId ? null : prev));
   }, []);
 
-  if (!grid) return null;
+  // Center camera whenever level loads or viewport changes
+  useEffect(() => {
+    if (!grid) return;
+    const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
+    const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
 
-  // Calculate board size dynamically to occupy up to 80% width and 65% height
-  const maxW = SCREEN_WIDTH * 0.80;
-  const maxH = SCREEN_HEIGHT * 0.65;
-  const maxCellWidth = Math.floor((maxW - (CELL_GAP * (grid.cols - 1))) / grid.cols);
-  const maxCellHeight = Math.floor((maxH - (CELL_GAP * (grid.rows - 1))) / grid.rows);
-  const cellSize = Math.min(maxCellWidth, maxCellHeight);
+    scale.value = 1;
+    savedScale.value = 1;
+    translateX.value = initX;
+    translateY.value = initY;
+    savedTranslateX.value = initX;
+    savedTranslateY.value = initY;
+  }, [grid?.levelNumber, grid?.seed, viewportSize.width, viewportSize.height]);
 
-  const boardWidth =
-    cellSize * grid.cols + CELL_GAP * (grid.cols - 1) + GRID_PADDING * 2;
-  const boardHeight =
-    cellSize * grid.rows + CELL_GAP * (grid.rows - 1) + GRID_PADDING * 2;
+  // Calculate dynamic cell size and centered offsets safely
+  const cellSize = grid ? getDynamicCellSize(grid.cols, grid.rows) : 55;
+  const boardWidth = grid
+    ? cellSize * grid.cols + CELL_GAP * (grid.cols - 1) + GRID_PADDING * 2
+    : 0;
+  const boardHeight = grid
+    ? cellSize * grid.rows + CELL_GAP * (grid.rows - 1) + GRID_PADDING * 2
+    : 0;
 
-  // Layer 1: Build a list of dot positions across the entire grid (visible in empty spaces)
+  const gridOffsetX = (CANVAS_SIZE - boardWidth) / 2;
+  const gridOffsetY = (CANVAS_SIZE - boardHeight) / 2;
+
+  // Build a list of dot positions across the active shape mask on the grid
   const dots = useMemo(() => {
-    const pts: { x: number; y: number }[] = [];
+    if (!grid) return [];
+    const pts: { x: number; y: number; col: number; row: number }[] = [];
     for (let r = 0; r < grid.rows; r++) {
       for (let c = 0; c < grid.cols; c++) {
-        const cx = c * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING;
-        const cy = r * (cellSize + CELL_GAP) + cellSize / 2 + GRID_PADDING;
-        pts.push({ x: cx, y: cy });
+        if (grid.shapeMask[r][c]) {
+          const cx =
+            c * (cellSize + CELL_GAP) +
+            cellSize / 2 +
+            GRID_PADDING +
+            gridOffsetX;
+          const cy =
+            r * (cellSize + CELL_GAP) +
+            cellSize / 2 +
+            GRID_PADDING +
+            gridOffsetY;
+          pts.push({ x: cx, y: cy, col: c, row: r });
+        }
       }
     }
     return pts;
-  }, [grid.rows, grid.cols, cellSize]);
+  }, [
+    grid?.rows,
+    grid?.cols,
+    grid?.shapeMask,
+    cellSize,
+    gridOffsetX,
+    gridOffsetY,
+  ]);
 
-  // Memoize static background SVG dot grid to prevent redraws on gameplay interactions
-  const dotGridSvg = useMemo(() => (
-    <Svg
-      width={boardWidth}
-      height={boardHeight}
-      style={StyleSheet.absoluteFill}
-    >
-      {dots.map((dot, index) => (
-        <Circle
-          key={index}
-          cx={dot.x}
-          cy={dot.y}
-          r={1.5}
-          fill={COLORS.dot}
-          opacity={0.8}
-        />
-      ))}
-    </Svg>
-  ), [boardWidth, boardHeight, dots]);
+  // Memoize static background SVG dot grid — shown only within the level's active shape mask
+  const dotGridSvg = useMemo(
+    () => (
+      <Svg
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        style={StyleSheet.absoluteFill}
+      >
+        {dots.map((dot, index) => (
+          <Circle
+            key={index}
+            cx={dot.x}
+            cy={dot.y}
+            r={2.8}
+            fill={COLORS.dot}
+            opacity={0.75}
+          />
+        ))}
+      </Svg>
+    ),
+    [dots],
+  );
 
   // RNGH v2 Gestures
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
-      scale.value = Math.max(0.5, Math.min(4, savedScale.value * e.scale));
+      scale.value = Math.max(0.8, Math.min(3, savedScale.value * e.scale));
     })
     .onEnd(() => {
       savedScale.value = scale.value;
@@ -98,12 +158,14 @@ export const GameGrid: React.FC = () => {
       const tx = savedTranslateX.value + e.translationX;
       const ty = savedTranslateY.value + e.translationY;
 
-      // Allow dragging in all directions. Limit drag distance to avoid losing the board.
-      const limitX = Math.max(SCREEN_WIDTH * 0.8, (boardWidth * scale.value) / 2);
-      const limitY = Math.max(SCREEN_HEIGHT * 0.6, (boardHeight * scale.value) / 2);
+      // Limit drag distance to avoid losing the board entirely
+      const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
+      const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
+      const limitX = 800 * scale.value;
+      const limitY = 800 * scale.value;
 
-      translateX.value = Math.max(-limitX, Math.min(limitX, tx));
-      translateY.value = Math.max(-limitY, Math.min(limitY, ty));
+      translateX.value = Math.max(initX - limitX, Math.min(initX + limitX, tx));
+      translateY.value = Math.max(initY - limitY, Math.min(initY + limitY, ty));
     })
     .onEnd(() => {
       savedTranslateX.value = translateX.value;
@@ -114,18 +176,20 @@ export const GameGrid: React.FC = () => {
   const doubleTapGesture = Gesture.Tap()
     .numberOfTaps(2)
     .onStart(() => {
+      const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
+      const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
       scale.value = withTiming(1);
-      translateX.value = withTiming(0);
-      translateY.value = withTiming(0);
+      translateX.value = withTiming(initX);
+      translateY.value = withTiming(initY);
       savedScale.value = 1;
-      savedTranslateX.value = 0;
-      savedTranslateY.value = 0;
+      savedTranslateX.value = initX;
+      savedTranslateY.value = initY;
     });
 
   // Combine Pinch and Pan gestures to execute concurrently, and allow double-tap
   const gesture = Gesture.Simultaneous(
     Gesture.Simultaneous(pinchGesture, panGesture),
-    doubleTapGesture
+    doubleTapGesture,
   );
 
   const animatedBoardStyle = useAnimatedStyle(() => ({
@@ -136,66 +200,70 @@ export const GameGrid: React.FC = () => {
     ],
   }));
 
+  if (!grid) return null;
+
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={onViewportLayout}>
       <GestureDetector gesture={gesture}>
-        <Animated.View
-          style={[
-            styles.board,
-            { width: boardWidth, height: boardHeight },
-            animatedBoardStyle,
-          ]}
-        >
-          {/* Layer 1: Static Background Dot Grid (Drawn in background, covered by arrows) */}
-          {dotGridSvg}
+        <View style={StyleSheet.absoluteFill} collapsable={false}>
+          <Animated.View
+            style={[
+              styles.board,
+              { width: CANVAS_SIZE, height: CANVAS_SIZE },
+              animatedBoardStyle,
+            ]}
+          >
+            {/* Layer 1: Static Background Dot Grid */}
+            {dotGridSvg}
 
-          {/* Layer 2: SVG Arrows and Interaction Targets */}
-          {grid.arrows.map((arrow) => {
-            const isHint = hintCellIds.includes(arrow.id);
-            const handleTap = () => {
-              if (arrow.isRemoved || isWon) return;
+            {/* Layer 2: SVG Arrows and Interaction Targets */}
+            {Object.values(grid.cells).map((cell) => {
+              const isHint = hintGroupIds.includes(cell.groupId);
+              const handleTap = () => {
+                if (cell.isRemoved || isWon) return;
 
-              const escaped = tapArrow(arrow.id);
+                const escaped = tapGroup(cell.groupId);
 
-              if (escaped) {
-                // Play arrow click sound effect
-                playTap();
-              } else {
-                if (haptics) {
-                  Haptics.notificationAsync(
-                    Haptics.NotificationFeedbackType.Warning,
-                  ).catch(() => {});
-                }
-                setShakingArrowId(arrow.id);
-              }
-            };
-
-            return (
-              <ArrowCell
-                key={arrow.id}
-                arrow={arrow}
-                cellSize={cellSize}
-                cellGap={CELL_GAP}
-                padding={GRID_PADDING}
-                isHint={isHint}
-                isSelected={selectedArrowId === arrow.id}
-                onTap={handleTap}
-                onEscapeComplete={() => {
+                if (escaped) {
+                  // Play tap sound
+                  playTap();
+                } else {
                   if (haptics) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                      () => {},
-                    );
+                    Haptics.notificationAsync(
+                      Haptics.NotificationFeedbackType.Warning,
+                    ).catch(() => {});
                   }
-                  removeArrowState(arrow.id);
-                }}
-                triggerShake={shakingArrowId === arrow.id}
-                onShakeDone={() => handleShakeDone(arrow.id)}
-                svgWidth={boardWidth}
-                svgHeight={boardHeight}
-              />
-            );
-          })}
-        </Animated.View>
+                  setShakingGroupId(cell.groupId);
+                }
+              };
+
+              return (
+                <ArrowCell
+                  key={cell.id}
+                  cell={cell}
+                  cellSize={cellSize}
+                  cellGap={CELL_GAP}
+                  padding={GRID_PADDING}
+                  isHint={isHint}
+                  isSelected={selectedGroupId === cell.groupId}
+                  onTap={handleTap}
+                  onEscapeComplete={() => {
+                    if (haptics) {
+                      Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light,
+                      ).catch(() => {});
+                    }
+                    removeGroupState(cell.groupId);
+                  }}
+                  triggerShake={shakingGroupId === cell.groupId}
+                  onShakeDone={() => handleShakeDone(cell.groupId)}
+                  offsetX={gridOffsetX}
+                  offsetY={gridOffsetY}
+                />
+              );
+            })}
+          </Animated.View>
+        </View>
       </GestureDetector>
     </View>
   );
@@ -204,9 +272,8 @@ export const GameGrid: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "visible", // Allow escaping arrows to travel far away off the screen boundaries
+    overflow: "hidden",
+    position: "relative",
   },
   board: {
     backgroundColor: "transparent",

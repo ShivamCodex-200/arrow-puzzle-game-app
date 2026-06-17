@@ -1,8 +1,8 @@
 import { create } from "zustand";
-import { canEscape } from "../engine/canEscape";
-import { checkWin, escapeArrow, isDeadlock } from "../engine/escapeArrow";
+import { canGroupEscape } from "../engine/canEscape";
+import { checkWin, escapeGroup, isDeadlock } from "../engine/escapeArrow";
 import { generateLevel } from "../engine/generateLevel";
-import type { GridState } from "../engine/types";
+import type { GridState, Cell, Group } from "../engine/types";
 
 interface GameStore {
   grid: GridState | null;
@@ -14,18 +14,35 @@ interface GameStore {
   isGameOver: boolean;
   history: GridState[];
   hints: number;
-  hintCellIds: string[];
-  selectedArrowId: string | null;
+  hintGroupIds: string[];
+  selectedGroupId: string | null;
 
   loadLevel: (level: number) => void;
-  tapArrow: (arrowId: string) => boolean;
-  removeArrowState: (arrowId: string) => void;
+  tapGroup: (groupId: string) => boolean;
+  removeGroupState: (groupId: string) => void;
   undoMove: () => void;
   useHint: () => void;
   clearHint: () => void;
   resetLevel: () => void;
   nextLevel: () => void;
 }
+
+// Deep clone GridState to ensure undo/history/reset works perfectly
+const cloneGrid = (g: GridState): GridState => {
+  const cells: Record<string, Cell> = {};
+  for (const [k, v] of Object.entries(g.cells)) {
+    cells[k] = { ...v };
+  }
+  const groups: Record<string, Group> = {};
+  for (const [k, v] of Object.entries(g.groups)) {
+    groups[k] = { ...v, cellIds: [...v.cellIds] };
+  }
+  return {
+    ...g,
+    cells,
+    groups,
+  };
+};
 
 export const useGameStore = create<GameStore>((set, get) => ({
   grid: null,
@@ -37,50 +54,49 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isGameOver: false,
   history: [],
   hints: 3,
-  hintCellIds: [],
-  selectedArrowId: null,
+  hintGroupIds: [],
+  selectedGroupId: null,
 
   // ── Load level ────────────────────────────────────────────────────────────
   loadLevel: (level: number) => {
     const lvl = Math.max(1, Math.floor(level));
     const grid = generateLevel(lvl);
+
     set({
       grid,
-      initialGrid: grid,
+      initialGrid: cloneGrid(grid),
       moves: 0,
       isWon: false,
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
-      selectedArrowId: null,
+      selectedGroupId: null,
       history: [],
-      hintCellIds: [],
+      hintGroupIds: [],
     });
   },
 
-  // ── Tap arrow → returns true if escapes, false if blocked ─────────────────
-  tapArrow: (arrowId: string) => {
+  // ── Tap group → returns true if escapes, false if blocked ─────────────────
+  tapGroup: (groupId: string) => {
     const state = get();
     if (!state.grid || state.isWon || state.isDeadlocked || state.isGameOver) return false;
 
-    const arrow = state.grid.arrows.find((a) => a.id === arrowId);
-    if (!arrow || arrow.isRemoved) return false;
+    const group = state.grid.groups[groupId];
+    if (!group || group.isRemoved) return false;
 
-    if (!canEscape(state.grid, arrowId)) {
-      // Tap blocked arrow -> lose a life
+    if (!canGroupEscape(state.grid, groupId)) {
+      // Tap blocked group -> lose a life
       const newLives = Math.max(0, state.lives - 1);
       set({
         lives: newLives,
         isGameOver: newLives === 0,
-        selectedArrowId: null,
+        selectedGroupId: null,
       });
       return false;
     }
 
-    // Save current state to history before escape mutation
-    const currentGridCopy = JSON.parse(JSON.stringify(state.grid)) as GridState;
-
-    const newGrid = escapeArrow(state.grid, arrowId);
+    const currentGridCopy = cloneGrid(state.grid);
+    const newGrid = escapeGroup(state.grid, groupId);
     const won = checkWin(newGrid);
     const deadlocked = !won && isDeadlock(newGrid);
 
@@ -89,16 +105,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: state.moves + 1,
       isWon: won,
       isDeadlocked: deadlocked,
-      selectedArrowId: arrowId,
+      selectedGroupId: groupId,
       history: [...state.history.slice(-9), currentGridCopy],
-      hintCellIds: [],
+      hintGroupIds: [],
     });
 
     if (won) {
       // Report to progress store lazily (avoids circular import)
       try {
         const { useProgressStore } = require("../store/useProgressStore");
-        const total = newGrid.totalArrows;
+        const total = newGrid.totalGroups;
         const movesUsed = state.moves + 1;
         const stars =
           movesUsed <= total ? 3 : movesUsed <= Math.floor(total * 1.5) ? 2 : 1;
@@ -111,19 +127,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return true;
   },
 
-  // ── Remove arrow from state completely ────────────────────────────────────
-  // Called once the slide animation finishes so it is completely unmounted.
-  removeArrowState: (arrowId: string) => {
-    const { grid, selectedArrowId } = get();
-    if (!grid) return;
-
-    const newArrows = grid.arrows.filter((a) => a.id !== arrowId);
+  // ── Remove group from active state ────────────────────────────────────────
+  removeGroupState: (groupId: string) => {
+    const { selectedGroupId } = get();
     set({
-      grid: {
-        ...grid,
-        arrows: newArrows,
-      },
-      selectedArrowId: selectedArrowId === arrowId ? null : selectedArrowId,
+      selectedGroupId: selectedGroupId === groupId ? null : selectedGroupId,
     });
   },
 
@@ -138,8 +146,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       moves: Math.max(0, moves - 1),
       isWon: false,
       isDeadlocked: false,
-      selectedArrowId: null,
-      hintCellIds: [],
+      selectedGroupId: null,
+      hintGroupIds: [],
     });
   },
 
@@ -149,55 +157,42 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!grid || hints <= 0) return;
 
     const escapable: string[] = [];
-    for (const a of grid.arrows) {
-      if (!a.isRemoved && canEscape(grid, a.id)) {
-        escapable.push(a.id);
+    for (const g of Object.values(grid.groups)) {
+      if (!g.isRemoved && canGroupEscape(grid, g.id)) {
+        escapable.push(g.id);
       }
     }
     if (escapable.length === 0) return;
 
-    // Highlight one random escapable arrow
+    // Highlight one random escapable group
     const choice = escapable[Math.floor(Math.random() * escapable.length)];
-    set({ hints: hints - 1, hintCellIds: [choice] });
-    setTimeout(() => set({ hintCellIds: [] }), 2000);
+    set({ hints: hints - 1, hintGroupIds: [choice] });
+    setTimeout(() => set({ hintGroupIds: [] }), 2000);
   },
 
-  clearHint: () => set({ hintCellIds: [] }),
+  clearHint: () => set({ hintGroupIds: [] }),
 
   // ── Reset ─────────────────────────────────────────────────────────────────
   resetLevel: () => {
     const { initialGrid } = get();
     if (!initialGrid) return;
     set({
-      grid: initialGrid,
+      grid: cloneGrid(initialGrid),
       moves: 0,
       isWon: false,
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
-      selectedArrowId: null,
+      selectedGroupId: null,
       history: [],
-      hintCellIds: [],
+      hintGroupIds: [],
     });
   },
 
   // ── Next level ────────────────────────────────────────────────────────────
   nextLevel: () => {
-    const { grid } = get();
+    const { grid, loadLevel } = get();
     if (!grid) return;
-    const nextLvl = grid.levelNumber + 1;
-    const newGrid = generateLevel(nextLvl);
-    set({
-      grid: newGrid,
-      initialGrid: newGrid,
-      moves: 0,
-      isWon: false,
-      isDeadlocked: false,
-      lives: 3,
-      isGameOver: false,
-      selectedArrowId: null,
-      history: [],
-      hintCellIds: [],
-    });
+    loadLevel(grid.levelNumber + 1);
   },
 }));

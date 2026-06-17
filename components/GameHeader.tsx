@@ -39,8 +39,8 @@ export const GameHeader: React.FC = () => {
   const level = grid.levelNumber;
   const diff = grid.difficulty || getDifficulty(level);
 
-  // Count active (unremoved) arrows remaining
-  const remainingCount = grid.arrows.filter((a) => !a.isRemoved).length;
+  // Count active (unremoved) groups remaining
+  const remainingCount = Object.values(grid.groups).filter((g) => !g.isRemoved).length;
 
   return (
     <View className="px-4 pt-3 pb-2 z-10 bg-game-bg">

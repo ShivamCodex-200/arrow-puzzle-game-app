@@ -1,54 +1,44 @@
-import type { Arrow, GridState, Point } from "./types";
-
 /**
- * Returns all grid cells occupied by the given arrow.
- * Since the arrow cells are stored directly, this returns the cells array itself.
+ * engine/canEscape.ts
+ *
+ * Check if a group of cells can escape.
+ * A group can escape if its HEAD cell has a clear path to the edge
+ * in its movement direction (no other active/unremoved cells in the way).
+ * The group's own body cells do not block itself.
  */
-export function getOccupiedCells(arrow: Arrow): Point[] {
-  return arrow.cells;
-}
 
-/**
- * Returns true if the arrow can escape the board in its exit direction.
- * The arrow crawls forward along its own path. Its body stays inside its original
- * path envelope, and its head moves straight forward along the exit direction.
- * Therefore, we only need to check if the exit path from the head (final cell) to the board edge is clear.
- */
-export function canEscape(grid: GridState, arrowId: string): boolean {
-  const arrow = grid.arrows.find((a) => a.id === arrowId);
-  if (!arrow || arrow.isRemoved) return false;
+import type { GridState } from "./types";
 
-  // 1. Gather all cells occupied by OTHER active arrows
-  const otherOccupied = new Set<string>();
-  for (const a of grid.arrows) {
-    if (a.id !== arrowId && !a.isRemoved) {
-      for (const cell of a.cells) {
-        otherOccupied.add(`${cell.x},${cell.y}`);
-      }
-    }
-  }
+const DIR_DX = { up: 0, down: 0, left: -1, right: 1 };
+const DIR_DY = { up: -1, down: 1, left: 0, right: 0 };
 
-  // 2. Check path from the head of this arrow (the last cell in the cells list) to the grid edge
-  const head = arrow.cells[arrow.cells.length - 1];
-  const dir = arrow.direction;
-  let cx = head.x;
-  let cy = head.y;
+export function canGroupEscape(grid: GridState, groupId: string): boolean {
+  const group = grid.groups[groupId];
+  if (!group || group.isRemoved || group.isRemoving) return false;
 
-  while (true) {
-    if (dir === "right") cx++;
-    else if (dir === "left") cx--;
-    else if (dir === "down") cy++;
-    else cy--;
+  // The HEAD is the last element in group.cellIds
+  const headId = group.cellIds[group.cellIds.length - 1];
+  const head = grid.cells[headId];
+  if (!head || head.isRemoved) return false;
 
-    // Reached the edge of the board
-    if (cx < 0 || cx >= grid.cols || cy < 0 || cy >= grid.rows) {
-      break;
-    }
+  const dx = DIR_DX[group.direction];
+  const dy = DIR_DY[group.direction];
 
-    // Blocked by another active arrow
-    if (otherOccupied.has(`${cx},${cy}`)) {
+  let cx = head.col + dx;
+  let cy = head.row + dy;
+
+  while (cx >= 0 && cx < grid.cols && cy >= 0 && cy < grid.rows) {
+    const cid = `${cx}-${cy}`;
+    const cell = grid.cells[cid];
+
+    // If there is an active (unremoved) cell at this position
+    // and it belongs to a different group, we are blocked.
+    if (cell && !cell.isRemoved && cell.groupId !== groupId) {
       return false;
     }
+
+    cx += dx;
+    cy += dy;
   }
 
   return true;

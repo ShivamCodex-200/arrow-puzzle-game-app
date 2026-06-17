@@ -1,25 +1,42 @@
 import { useState, useCallback, useEffect } from 'react';
 import { generateDailyChallenge } from '../engine/dailyChallengeGenerator';
-import { canEscape } from '../engine/canEscape';
-import { escapeArrow, checkWin } from '../engine/escapeArrow';
-import type { GridState } from '../engine/types';
+import { canGroupEscape } from '../engine/canEscape';
+import { escapeGroup, checkWin } from '../engine/escapeArrow';
+import type { GridState, Cell, Group } from '../engine/types';
 import { useSound } from './useSound';
 import { useHaptics } from './useHaptics';
 import { useDailyChallengeStore } from '../store/useDailyChallengeStore';
 
+// Helper to deep clone GridState
+const cloneGrid = (g: GridState): GridState => {
+  const cells: Record<string, Cell> = {};
+  for (const [k, v] of Object.entries(g.cells)) {
+    cells[k] = { ...v };
+  }
+  const groups: Record<string, Group> = {};
+  for (const [k, v] of Object.entries(g.groups)) {
+    groups[k] = { ...v, cellIds: [...v.cellIds] };
+  }
+  return {
+    ...g,
+    cells,
+    groups,
+  };
+};
+
 export function useDailyChallenge(dateStr: string) {
   const { playTap, playWin } = useSound();
   const haptics = useHaptics();
-  const { completeChallenge, completedDates } = useDailyChallengeStore();
+  const { completeChallenge } = useDailyChallengeStore();
 
   const [grid, setGrid] = useState<GridState | null>(null);
   const [initialGrid, setInitialGrid] = useState<GridState | null>(null);
-  
+
   // Game attempt-level states
   const [moves, setMoves] = useState<number>(0);
   const [lives, setLives] = useState<number>(3);
-  const [selectedArrowId, setSelectedArrowId] = useState<string | null>(null);
-  const [shakingArrowId, setShakingArrowId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [shakingGroupId, setShakingGroupId] = useState<string | null>(null);
   const [isWon, setIsWon] = useState<boolean>(false);
   const [isGameOver, setIsGameOver] = useState<boolean>(false);
 
@@ -31,35 +48,14 @@ export function useDailyChallenge(dateStr: string) {
     if (!dateStr) return;
 
     const challenge = generateDailyChallenge(dateStr);
-    
-    // Construct GridState matching the core engine's layout
-    const gridState: GridState = {
-      rows: challenge.boardHeight,
-      cols: challenge.boardWidth,
-      shape: 'rectangle',
-      shapeMask: Array.from({ length: challenge.boardHeight }, () => Array(challenge.boardWidth).fill(true)),
-      arrows: challenge.arrows,
-      levelNumber: 0,
-      totalArrows: challenge.arrows.length,
-      removedCount: 0,
-      seed: 0,
-      difficulty: challenge.difficulty === "easy" ? "Easy" : challenge.difficulty === "medium" ? "Normal" : challenge.difficulty === "hard" ? "Hard" : "Expert",
-      metrics: {
-        arrowCount: challenge.arrows.length,
-        averageArrowLength: 3.5,
-        intersections: 10,
-        deadEnds: 0,
-        removableArrowsAtStart: 3,
-        branchingFactor: 1.5
-      }
-    };
+    const gridState = challenge.grid;
 
-    setGrid(JSON.parse(JSON.stringify(gridState)));
-    setInitialGrid(gridState);
+    setGrid(cloneGrid(gridState));
+    setInitialGrid(cloneGrid(gridState));
     setMoves(0);
     setLives(3);
-    setSelectedArrowId(null);
-    setShakingArrowId(null);
+    setSelectedGroupId(null);
+    setShakingGroupId(null);
     setIsWon(false);
     setIsGameOver(false);
     setTimeElapsed(0);
@@ -84,26 +80,26 @@ export function useDailyChallenge(dateStr: string) {
 
   const resetChallenge = useCallback(() => {
     if (!initialGrid) return;
-    setGrid(JSON.parse(JSON.stringify(initialGrid)));
+    setGrid(cloneGrid(initialGrid));
     setMoves(0);
     setLives(3);
-    setSelectedArrowId(null);
-    setShakingArrowId(null);
+    setSelectedGroupId(null);
+    setShakingGroupId(null);
     setIsWon(false);
     setIsGameOver(false);
     setTimeElapsed(0);
   }, [initialGrid]);
 
-  // Tap arrow to trigger escape sequence
-  const tapArrow = useCallback((arrowId: string): boolean => {
+  // Tap group to trigger escape sequence
+  const tapGroup = useCallback((groupId: string): boolean => {
     if (!grid || isWon || isGameOver) return false;
 
-    const arrow = grid.arrows.find((a) => a.id === arrowId);
-    if (!arrow || arrow.isRemoved) return false;
+    const group = grid.groups[groupId];
+    if (!group || group.isRemoved) return false;
 
-    if (!canEscape(grid, arrowId)) {
+    if (!canGroupEscape(grid, groupId)) {
       haptics.warning();
-      setShakingArrowId(arrowId);
+      setShakingGroupId(groupId);
 
       const nextLives = Math.max(0, lives - 1);
       setLives(nextLives);
@@ -114,15 +110,15 @@ export function useDailyChallenge(dateStr: string) {
       return false;
     }
 
-    // Unblocked: slide out
+    // Unblocked: escape group
     playTap();
 
-    const nextGrid = escapeArrow(grid, arrowId);
+    const nextGrid = escapeGroup(grid, groupId);
     const won = checkWin(nextGrid);
 
     setGrid(nextGrid);
     setMoves((prev) => prev + 1);
-    setSelectedArrowId(arrowId);
+    setSelectedGroupId(groupId);
 
     if (won) {
       setIsWon(true);
@@ -138,20 +134,12 @@ export function useDailyChallenge(dateStr: string) {
     return true;
   }, [grid, isWon, isGameOver, lives, dateStr, playTap, playWin, haptics, completeChallenge]);
 
-  const removeArrowState = useCallback((arrowId: string) => {
-    setGrid((prevGrid) => {
-      if (!prevGrid) return null;
-      const newArrows = prevGrid.arrows.filter((a) => a.id !== arrowId);
-      return {
-        ...prevGrid,
-        arrows: newArrows,
-      };
-    });
-    setSelectedArrowId((prevSelected) => prevSelected === arrowId ? null : prevSelected);
+  const removeGroupState = useCallback((groupId: string) => {
+    setSelectedGroupId((prevSelected) => prevSelected === groupId ? null : prevSelected);
   }, []);
 
-  const handleShakeDone = useCallback((arrowId: string) => {
-    setShakingArrowId((prev) => prev === arrowId ? null : prev);
+  const handleShakeDone = useCallback((groupId: string) => {
+    setShakingGroupId((prev) => prev === groupId ? null : prev);
   }, []);
 
   return {
@@ -160,11 +148,11 @@ export function useDailyChallenge(dateStr: string) {
     lives,
     isWon,
     isGameOver,
-    selectedArrowId,
-    shakingArrowId,
+    selectedGroupId,
+    shakingGroupId,
     timeElapsed,
-    tapArrow,
-    removeArrowState,
+    tapGroup,
+    removeGroupState,
     handleShakeDone,
     resetChallenge,
   };

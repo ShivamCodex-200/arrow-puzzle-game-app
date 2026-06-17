@@ -18,6 +18,13 @@ module.exports = {
           badgeBg: '#E9EEF5',
         },
       },
+      fontFamily: {
+        sans: ['Outfit_400Regular'],
+        regular: ['Outfit_400Regular'],
+        semibold: ['Outfit_600SemiBold'],
+        bold: ['Outfit_700Bold'],
+        black: ['Outfit_900Black'],
+      },
     },
   },
   plugins: [],

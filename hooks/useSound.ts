@@ -1,34 +1,44 @@
+import { useState, useEffect } from 'react';
 import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { useSettingsStore } from '../store/useSettingsStore';
-
-// Global reference to cache the player instance
-let cachedTapPlayer: AudioPlayer | null = null;
-
-// Lazy getter to ensure the player is only created after native modules are initialized
-function getTapPlayer(): AudioPlayer {
-  if (!cachedTapPlayer) {
-    cachedTapPlayer = createAudioPlayer(require('../assets/arrow_click_sound_effect.wav'));
-  }
-  return cachedTapPlayer;
-}
 
 /**
  * Hook for playing game sound effects.
  * Checks the user's sound preference before playing anything.
+ * Uses lazy loading and handles resource cleanup to avoid crashes on mount.
  */
 export function useSound() {
   const { sounds } = useSettingsStore();
+  const [player, setPlayer] = useState<AudioPlayer | null>(null);
+
+  useEffect(() => {
+    if (!sounds) return;
+    let activePlayer: AudioPlayer | null = null;
+    try {
+      activePlayer = createAudioPlayer(require('../assets/arrow_click_sound_effect.wav'));
+      setPlayer(activePlayer);
+    } catch (err) {
+      console.warn("Failed to initialize audio player:", err);
+    }
+
+    return () => {
+      if (activePlayer) {
+        try {
+          if (typeof (activePlayer as any).release === 'function') {
+            (activePlayer as any).release();
+          }
+        } catch (_) {}
+      }
+    };
+  }, [sounds]);
 
   const playTap = async () => {
-    if (!sounds) return;
+    if (!sounds || !player) return;
     try {
-      const player = getTapPlayer();
       player.seekTo(0);
       player.play();
     } catch (e) {
-      // Safe fallback if audio is not fully loaded or seek fails
       try {
-        const player = getTapPlayer();
         player.play();
       } catch (_) {}
     }

@@ -11,17 +11,17 @@ export const COLORS = {
   cardBgRemoved:   'transparent',
 
   // Arrow icons
-  arrowNormal:     '#17243A', // dark navy
-  arrowEscapable:  '#17243A',
+  arrowNormal:     '#1F355E', // dark navy
+  arrowEscapable:  '#1F355E',
   arrowHint:       '#22C55E',
-  arrowHighlight:  '#FF5A3D', // orange-red highlight
+  arrowHighlight:  '#3B82F6', // blue highlight
 
   // Borders
   borderEscapable: 'transparent',
   borderHint:      '#22C55E',
 
   // Empty dot
-  dot:             '#A5B1C2',
+  dot:             '#C4CBD5',
 
   // Badge/Pill Background & Text
   badgeBg:         '#E9EEF5',
