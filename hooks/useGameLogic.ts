@@ -7,11 +7,11 @@ import { useSettingsStore } from '../store/useSettingsStore';
  * Use this in components that need to trigger game actions.
  */
 export function useGameLogic() {
-  const { tapGroup, resetLevel, useHint } = useGameStore();
+  const { tapSegment, resetLevel, useHint } = useGameStore();
   const { haptics } = useSettingsStore();
 
-  const handleTap = (groupId: string): boolean => {
-    const escaped = tapGroup(groupId);
+  const handleTap = (segmentId: string): boolean => {
+    const escaped = tapSegment(segmentId);
     if (escaped) {
       if (haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     } else {

@@ -1,282 +1,198 @@
-import * as Haptics from "expo-haptics";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import * as Haptics from 'expo-haptics';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Dimensions,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-} from "react-native-reanimated";
-import Svg, { Circle } from "react-native-svg";
-import { CELL_GAP, GRID_PADDING } from "../constants/config";
-import { COLORS } from "../constants/theme";
-import { useSound } from "../hooks/useSound";
-import { useGameStore } from "../store/useGameStore";
-import { useSettingsStore } from "../store/useSettingsStore";
-import { ArrowCell } from "./ArrowCell";
+} from 'react-native-reanimated';
+import { CELL_GAP, GRID_PADDING } from '../constants/config';
+import { useSound } from '../hooks/useSound';
+import { useGameStore } from '../store/useGameStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { SnakeRenderer } from './SnakeRenderer';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SW, height: SH } = Dimensions.get('window');
 
-const CANVAS_SIZE = 2400;
-
-const getDynamicCellSize = (cols: number, rows: number) => {
-  const maxDim = Math.max(cols, rows);
-  if (maxDim <= 6) return 60;
-  if (maxDim <= 10) return 55;
-  if (maxDim <= 15) return 50;
-  if (maxDim <= 20) return 45;
-  return 40;
-};
+function computeCellSize(cols: number, rows: number, vw: number, vh: number): number {
+  const byW = Math.floor((vw - GRID_PADDING * 2) / cols);
+  const byH = Math.floor((vh - GRID_PADDING * 2) / rows);
+  // Use the smaller so the whole board fits
+  return Math.max(20, Math.min(byW, byH, 58));
+}
 
 export const GameGrid: React.FC = () => {
   const {
-    grid,
-    tapGroup,
-    removeGroupState,
-    hintGroupIds,
+    puzzle,
+    tapSegment,
+    removeSegmentState,
+    hintSegIds,
     isWon,
-    selectedGroupId,
+    selectedSegId,
+    fullyRemovedSegIds,
   } = useGameStore();
+
   const { haptics } = useSettingsStore();
   const { playTap } = useSound();
+  const [shakingSegId, setShakingSegId] = useState<string | null>(null);
+  const [vp, setVp] = useState({ w: SW, h: SH - 200 });
 
-  const [shakingGroupId, setShakingGroupId] = useState<string | null>(null);
-
-  const [viewportSize, setViewportSize] = useState({
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT - 200,
-  });
-
-  const onViewportLayout = useCallback((event: any) => {
-    const { width, height } = event.nativeEvent.layout;
-    setViewportSize({ width, height });
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width > 0 && height > 0) setVp({ w: width, h: height });
   }, []);
 
-  // Zoom and Pan Shared Values
+  const cellSize = puzzle
+    ? computeCellSize(puzzle.cols, puzzle.rows, vp.w, vp.h)
+    : 36;
+
+  const boardW = puzzle
+    ? cellSize * puzzle.cols + CELL_GAP * (puzzle.cols - 1) + GRID_PADDING * 2
+    : 0;
+  const boardH = puzzle
+    ? cellSize * puzzle.rows + CELL_GAP * (puzzle.rows - 1) + GRID_PADDING * 2
+    : 0;
+
+  // Pan/Pinch/DoubleTap
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const stx = useSharedValue(0);
+  const sty = useSharedValue(0);
 
-  const handleShakeDone = useCallback((groupId: string) => {
-    setShakingGroupId((prev) => (prev === groupId ? null : prev));
-  }, []);
-
-  // Center camera whenever level loads or viewport changes
   useEffect(() => {
-    if (!grid) return;
-    const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
-    const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
-
+    if (!puzzle || boardW === 0 || boardH === 0) return;
+    const ix = (vp.w - boardW) / 2;
+    const iy = (vp.h - boardH) / 2;
     scale.value = 1;
     savedScale.value = 1;
-    translateX.value = initX;
-    translateY.value = initY;
-    savedTranslateX.value = initX;
-    savedTranslateY.value = initY;
-  }, [grid?.levelNumber, grid?.seed, viewportSize.width, viewportSize.height]);
+    tx.value = ix; ty.value = iy;
+    stx.value = ix; sty.value = iy;
+  }, [puzzle?.levelNumber, vp.w, vp.h, boardW, boardH]);
 
-  // Calculate dynamic cell size and centered offsets safely
-  const cellSize = grid ? getDynamicCellSize(grid.cols, grid.rows) : 55;
-  const boardWidth = grid
-    ? cellSize * grid.cols + CELL_GAP * (grid.cols - 1) + GRID_PADDING * 2
-    : 0;
-  const boardHeight = grid
-    ? cellSize * grid.rows + CELL_GAP * (grid.rows - 1) + GRID_PADDING * 2
-    : 0;
+  const pinch = Gesture.Pinch()
+    .onUpdate(e => { scale.value = Math.max(0.5, Math.min(3, savedScale.value * e.scale)); })
+    .onEnd(() => { savedScale.value = scale.value; });
 
-  const gridOffsetX = (CANVAS_SIZE - boardWidth) / 2;
-  const gridOffsetY = (CANVAS_SIZE - boardHeight) / 2;
-
-  // Build a list of dot positions across the active shape mask on the grid
-  const dots = useMemo(() => {
-    if (!grid) return [];
-    const pts: { x: number; y: number; col: number; row: number }[] = [];
-    for (let r = 0; r < grid.rows; r++) {
-      for (let c = 0; c < grid.cols; c++) {
-        if (grid.shapeMask[r][c]) {
-          const cx =
-            c * (cellSize + CELL_GAP) +
-            cellSize / 2 +
-            GRID_PADDING +
-            gridOffsetX;
-          const cy =
-            r * (cellSize + CELL_GAP) +
-            cellSize / 2 +
-            GRID_PADDING +
-            gridOffsetY;
-          pts.push({ x: cx, y: cy, col: c, row: r });
-        }
-      }
-    }
-    return pts;
-  }, [
-    grid?.rows,
-    grid?.cols,
-    grid?.shapeMask,
-    cellSize,
-    gridOffsetX,
-    gridOffsetY,
-  ]);
-
-  // Memoize static background SVG dot grid — shown only within the level's active shape mask
-  const dotGridSvg = useMemo(
-    () => (
-      <Svg
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        style={StyleSheet.absoluteFill}
-      >
-        {dots.map((dot, index) => (
-          <Circle
-            key={index}
-            cx={dot.x}
-            cy={dot.y}
-            r={2.8}
-            fill={COLORS.dot}
-            opacity={0.75}
-          />
-        ))}
-      </Svg>
-    ),
-    [dots],
-  );
-
-  // RNGH v2 Gestures
-  const pinchGesture = Gesture.Pinch()
-    .onUpdate((e) => {
-      scale.value = Math.max(0.8, Math.min(3, savedScale.value * e.scale));
+  const pan = Gesture.Pan()
+    .onUpdate(e => {
+      const ix = (vp.w - boardW) / 2;
+      const iy = (vp.h - boardH) / 2;
+      const lim = Math.max(boardW, boardH) * scale.value;
+      tx.value = Math.max(ix - lim, Math.min(ix + lim, stx.value + e.translationX));
+      ty.value = Math.max(iy - lim, Math.min(iy + lim, sty.value + e.translationY));
     })
-    .onEnd(() => {
-      savedScale.value = scale.value;
-    });
+    .onEnd(() => { stx.value = tx.value; sty.value = ty.value; });
 
-  const panGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      const tx = savedTranslateX.value + e.translationX;
-      const ty = savedTranslateY.value + e.translationY;
+  const dblTap = Gesture.Tap().numberOfTaps(2).onStart(() => {
+    const ix = (vp.w - boardW) / 2;
+    const iy = (vp.h - boardH) / 2;
+    scale.value = withTiming(1);
+    tx.value = withTiming(ix);
+    ty.value = withTiming(iy);
+    savedScale.value = 1;
+    stx.value = ix;
+    sty.value = iy;
+  });
 
-      // Limit drag distance to avoid losing the board entirely
-      const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
-      const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
-      const limitX = 800 * scale.value;
-      const limitY = 800 * scale.value;
-
-      translateX.value = Math.max(initX - limitX, Math.min(initX + limitX, tx));
-      translateY.value = Math.max(initY - limitY, Math.min(initY + limitY, ty));
-    })
-    .onEnd(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
-      savedScale.value = scale.value;
-    });
-
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .onStart(() => {
-      const initX = viewportSize.width / 2 - CANVAS_SIZE / 2;
-      const initY = viewportSize.height / 2 - CANVAS_SIZE / 2;
-      scale.value = withTiming(1);
-      translateX.value = withTiming(initX);
-      translateY.value = withTiming(initY);
-      savedScale.value = 1;
-      savedTranslateX.value = initX;
-      savedTranslateY.value = initY;
-    });
-
-  // Combine Pinch and Pan gestures to execute concurrently, and allow double-tap
   const gesture = Gesture.Simultaneous(
-    Gesture.Simultaneous(pinchGesture, panGesture),
-    doubleTapGesture,
+    Gesture.Simultaneous(pinch, pan),
+    dblTap
   );
 
-  const animatedBoardStyle = useAnimatedStyle(() => ({
+  const boardStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
+      { translateX: tx.value },
+      { translateY: ty.value },
       { scale: scale.value },
     ],
   }));
 
-  if (!grid) return null;
+  const handleTap = useCallback((segId: string) => {
+    if (isWon) return;
+    const escaped = tapSegment(segId);
+    if (escaped) {
+      playTap();
+    } else {
+      if (haptics) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setShakingSegId(segId);
+    }
+  }, [isWon, tapSegment, playTap, haptics]);
+
+  const handleEscapeComplete = useCallback((segId: string) => {
+    if (haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    removeSegmentState(segId);
+  }, [removeSegmentState, haptics]);
+
+  const handleShakeDone = useCallback((segId: string) => {
+    setShakingSegId(prev => prev === segId ? null : prev);
+  }, []);
+
+  if (!puzzle) return null;
 
   return (
-    <View style={styles.container} onLayout={onViewportLayout}>
+    <View style={styles.viewport} onLayout={onLayout}>
       <GestureDetector gesture={gesture}>
-        <View style={StyleSheet.absoluteFill} collapsable={false}>
-          <Animated.View
-            style={[
-              styles.board,
-              { width: CANVAS_SIZE, height: CANVAS_SIZE },
-              animatedBoardStyle,
-            ]}
-          >
-            {/* Layer 1: Static Background Dot Grid */}
-            {dotGridSvg}
+        <Animated.View
+          style={[styles.board, { width: boardW, height: boardH }, boardStyle]}
+        >
+          {/* Snake lines and arrowheads */}
+          <SnakeRenderer
+            puzzle={puzzle}
+            cellSize={cellSize}
+            cellGap={CELL_GAP}
+            padding={GRID_PADDING}
+            hintSegIds={hintSegIds}
+            selectedSegId={selectedSegId}
+            shakingSegId={shakingSegId}
+            onShakeDone={handleShakeDone}
+            onEscapeComplete={handleEscapeComplete}
+          />
 
-            {/* Layer 2: SVG Arrows and Interaction Targets */}
-            {Object.values(grid.cells).map((cell) => {
-              const isHint = hintGroupIds.includes(cell.groupId);
-              const handleTap = () => {
-                if (cell.isRemoved || isWon) return;
+          {/* Tap zones — transparent but interactive */}
+          {puzzle.segments.map(seg => {
+            if (fullyRemovedSegIds.has(seg.id)) return null;
+            if (seg.isRemoved || seg.isRemoving) return null;
 
-                const escaped = tapGroup(cell.groupId);
-
-                if (escaped) {
-                  // Play tap sound
-                  playTap();
-                } else {
-                  if (haptics) {
-                    Haptics.notificationAsync(
-                      Haptics.NotificationFeedbackType.Warning,
-                    ).catch(() => {});
-                  }
-                  setShakingGroupId(cell.groupId);
-                }
-              };
-
+            return seg.cells.map((cell, idx) => {
+              const left = GRID_PADDING + cell.col * (cellSize + CELL_GAP);
+              const top = GRID_PADDING + cell.row * (cellSize + CELL_GAP);
               return (
-                <ArrowCell
-                  key={cell.id}
-                  cell={cell}
-                  cellSize={cellSize}
-                  cellGap={CELL_GAP}
-                  padding={GRID_PADDING}
-                  isHint={isHint}
-                  isSelected={selectedGroupId === cell.groupId}
-                  onTap={handleTap}
-                  onEscapeComplete={() => {
-                    if (haptics) {
-                      Haptics.impactAsync(
-                        Haptics.ImpactFeedbackStyle.Light,
-                      ).catch(() => {});
-                    }
-                    removeGroupState(cell.groupId);
-                  }}
-                  triggerShake={shakingGroupId === cell.groupId}
-                  onShakeDone={() => handleShakeDone(cell.groupId)}
-                  offsetX={gridOffsetX}
-                  offsetY={gridOffsetY}
+                <Pressable
+                  key={`${seg.id}-${idx}`}
+                  onPress={() => handleTap(seg.id)}
+                  style={[styles.tapZone, { left, top, width: cellSize, height: cellSize }]}
                 />
               );
-            })}
-          </Animated.View>
-        </View>
+            });
+          })}
+        </Animated.View>
       </GestureDetector>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  viewport: {
     flex: 1,
-    overflow: "hidden",
-    position: "relative",
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   board: {
-    backgroundColor: "transparent",
-    overflow: "visible", // Ensure escaping arrows are not clipped by the canvas container
+    position: 'absolute',
+    backgroundColor: 'transparent',
+    overflow: 'visible',
+  },
+  tapZone: {
+    position: 'absolute',
+    backgroundColor: 'transparent',
   },
 });

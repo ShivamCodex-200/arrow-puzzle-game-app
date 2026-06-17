@@ -1,25 +1,32 @@
 import { create } from "zustand";
-import { canGroupEscape } from "../engine/canEscape";
-import { checkWin, escapeGroup, isDeadlock } from "../engine/escapeArrow";
-import { generateLevel } from "../engine/generateLevel";
-import type { GridState, Cell, Group } from "../engine/types";
+import { generatePuzzle } from "../engine/pathGenerator";
+import {
+  canSegmentEscape,
+  isDeadlocked,
+  checkWin,
+  escapeSegment,
+  finalizeRemoval,
+  getEscapableIds,
+} from "../engine/segmentSolver";
+import type { PuzzleState, Segment } from "../engine/types";
 
 interface GameStore {
-  grid: GridState | null;
-  initialGrid: GridState | null;
+  puzzle: PuzzleState | null;
+  initialPuzzle: PuzzleState | null;
   moves: number;
   isWon: boolean;
   isDeadlocked: boolean;
   lives: number;
   isGameOver: boolean;
-  history: GridState[];
+  history: PuzzleState[];
   hints: number;
-  hintGroupIds: string[];
-  selectedGroupId: string | null;
+  hintSegIds: string[];
+  selectedSegId: string | null;
+  fullyRemovedSegIds: Set<string>;
 
   loadLevel: (level: number) => void;
-  tapGroup: (groupId: string) => boolean;
-  removeGroupState: (groupId: string) => void;
+  tapSegment: (segmentId: string) => boolean;
+  removeSegmentState: (segmentId: string) => void;
   undoMove: () => void;
   useHint: () => void;
   clearHint: () => void;
@@ -27,26 +34,23 @@ interface GameStore {
   nextLevel: () => void;
 }
 
-// Deep clone GridState to ensure undo/history/reset works perfectly
-const cloneGrid = (g: GridState): GridState => {
-  const cells: Record<string, Cell> = {};
-  for (const [k, v] of Object.entries(g.cells)) {
-    cells[k] = { ...v };
-  }
-  const groups: Record<string, Group> = {};
-  for (const [k, v] of Object.entries(g.groups)) {
-    groups[k] = { ...v, cellIds: [...v.cellIds] };
-  }
+const clonePuzzle = (p: PuzzleState): PuzzleState => {
+  const segments: Segment[] = p.segments.map((s) => ({
+    ...s,
+    cells: s.cells.map((c) => ({ ...c })),
+    ghostCell: { ...s.ghostCell },
+  }));
   return {
-    ...g,
-    cells,
-    groups,
+    ...p,
+    segments,
+    cellToSegId: { ...p.cellToSegId },
+    activeSegIds: new Set(p.activeSegIds),
   };
 };
 
 export const useGameStore = create<GameStore>((set, get) => ({
-  grid: null,
-  initialGrid: null,
+  puzzle: null,
+  initialPuzzle: null,
   moves: 0,
   isWon: false,
   isDeadlocked: false,
@@ -54,145 +58,165 @@ export const useGameStore = create<GameStore>((set, get) => ({
   isGameOver: false,
   history: [],
   hints: 3,
-  hintGroupIds: [],
-  selectedGroupId: null,
+  hintSegIds: [],
+  selectedSegId: null,
+  fullyRemovedSegIds: new Set<string>(),
 
-  // ── Load level ────────────────────────────────────────────────────────────
+  // ── Load level ──────────────────────────────────────────────────────────
   loadLevel: (level: number) => {
     const lvl = Math.max(1, Math.floor(level));
-    const grid = generateLevel(lvl);
-
+    const puzzle = generatePuzzle(lvl);
     set({
-      grid,
-      initialGrid: cloneGrid(grid),
+      puzzle,
+      initialPuzzle: clonePuzzle(puzzle),
       moves: 0,
       isWon: false,
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
-      selectedGroupId: null,
+      selectedSegId: null,
       history: [],
-      hintGroupIds: [],
+      hintSegIds: [],
+      fullyRemovedSegIds: new Set<string>(),
     });
   },
 
-  // ── Tap group → returns true if escapes, false if blocked ─────────────────
-  tapGroup: (groupId: string) => {
+  // ── Tap segment ──────────────────────────────────────────────────────────
+  tapSegment: (segmentId: string) => {
     const state = get();
-    if (!state.grid || state.isWon || state.isDeadlocked || state.isGameOver) return false;
+    if (
+      !state.puzzle ||
+      state.isWon ||
+      state.isDeadlocked ||
+      state.isGameOver
+    )
+      return false;
 
-    const group = state.grid.groups[groupId];
-    if (!group || group.isRemoved) return false;
+    const segment = state.puzzle.segments.find((s) => s.id === segmentId);
+    if (!segment || segment.isRemoved || segment.isRemoving) return false;
 
-    if (!canGroupEscape(state.grid, groupId)) {
-      // Tap blocked group -> lose a life
+    // Check if segment can escape
+    const canEscape = canSegmentEscape(
+      segment,
+      state.puzzle.activeSegIds,
+      state.puzzle.cellToSegId,
+      state.puzzle.rows,
+      state.puzzle.cols
+    );
+
+    if (!canEscape) {
       const newLives = Math.max(0, state.lives - 1);
       set({
         lives: newLives,
         isGameOver: newLives === 0,
-        selectedGroupId: null,
+        selectedSegId: null,
       });
       return false;
     }
 
-    const currentGridCopy = cloneGrid(state.grid);
-    const newGrid = escapeGroup(state.grid, groupId);
-    const won = checkWin(newGrid);
-    const deadlocked = !won && isDeadlock(newGrid);
+    const currentPuzzleCopy = clonePuzzle(state.puzzle);
+    const newPuzzle = escapeSegment(state.puzzle, segmentId);
+    const won = checkWin(newPuzzle);
+    const deadlocked = !won && isDeadlocked(newPuzzle);
 
     set({
-      grid: newGrid,
+      puzzle: newPuzzle,
       moves: state.moves + 1,
       isWon: won,
       isDeadlocked: deadlocked,
-      selectedGroupId: groupId,
-      history: [...state.history.slice(-9), currentGridCopy],
-      hintGroupIds: [],
+      selectedSegId: segmentId,
+      history: [...state.history.slice(-9), currentPuzzleCopy],
+      hintSegIds: [],
     });
 
     if (won) {
-      // Report to progress store lazily (avoids circular import)
       try {
         const { useProgressStore } = require("../store/useProgressStore");
-        const total = newGrid.totalGroups;
+        const total = newPuzzle.totalSegments;
         const movesUsed = state.moves + 1;
         const stars =
-          movesUsed <= total ? 3 : movesUsed <= Math.floor(total * 1.5) ? 2 : 1;
-        useProgressStore
-          .getState()
-          .completeLevel(state.grid.levelNumber, stars);
+          movesUsed <= total
+            ? 3
+            : movesUsed <= Math.floor(total * 1.5)
+            ? 2
+            : 1;
+        useProgressStore.getState().completeLevel(state.puzzle!.levelNumber, stars);
       } catch (_) {}
     }
 
     return true;
   },
 
-  // ── Remove group from active state ────────────────────────────────────────
-  removeGroupState: (groupId: string) => {
-    const { selectedGroupId } = get();
-    set({
-      selectedGroupId: selectedGroupId === groupId ? null : selectedGroupId,
+  // ── Called when escape animation finishes ───────────────────────────────
+  removeSegmentState: (segmentId: string) => {
+    set((state) => {
+      if (!state.puzzle) return {};
+      const updatedPuzzle = finalizeRemoval(state.puzzle, segmentId);
+      const next = new Set(state.fullyRemovedSegIds);
+      next.add(segmentId);
+      return {
+        puzzle: updatedPuzzle,
+        fullyRemovedSegIds: next,
+        selectedSegId:
+          state.selectedSegId === segmentId ? null : state.selectedSegId,
+      };
     });
   },
 
-  // ── Undo ──────────────────────────────────────────────────────────────────
+  // ── Undo ────────────────────────────────────────────────────────────────
   undoMove: () => {
     const { history, moves } = get();
     if (history.length === 0) return;
     const prev = history[history.length - 1];
     set({
-      grid: prev,
+      puzzle: prev,
       history: history.slice(0, -1),
       moves: Math.max(0, moves - 1),
       isWon: false,
       isDeadlocked: false,
-      selectedGroupId: null,
-      hintGroupIds: [],
+      selectedSegId: null,
+      hintSegIds: [],
+      fullyRemovedSegIds: new Set<string>(),
     });
   },
 
-  // ── Hint ──────────────────────────────────────────────────────────────────
+  // ── Hint ────────────────────────────────────────────────────────────────
   useHint: () => {
-    const { grid, hints } = get();
-    if (!grid || hints <= 0) return;
+    const { puzzle, hints } = get();
+    if (!puzzle || hints <= 0) return;
 
-    const escapable: string[] = [];
-    for (const g of Object.values(grid.groups)) {
-      if (!g.isRemoved && canGroupEscape(grid, g.id)) {
-        escapable.push(g.id);
-      }
-    }
+    const escapable = getEscapableIds(puzzle);
     if (escapable.length === 0) return;
 
-    // Highlight one random escapable group
     const choice = escapable[Math.floor(Math.random() * escapable.length)];
-    set({ hints: hints - 1, hintGroupIds: [choice] });
-    setTimeout(() => set({ hintGroupIds: [] }), 2000);
+    set({ hints: hints - 1, hintSegIds: [choice] });
+    setTimeout(() => set({ hintSegIds: [] }), 2000);
   },
 
-  clearHint: () => set({ hintGroupIds: [] }),
+  clearHint: () => set({ hintSegIds: [] }),
 
-  // ── Reset ─────────────────────────────────────────────────────────────────
+  // ── Reset ───────────────────────────────────────────────────────────────
   resetLevel: () => {
-    const { initialGrid } = get();
-    if (!initialGrid) return;
+    const { initialPuzzle } = get();
+    if (!initialPuzzle) return;
     set({
-      grid: cloneGrid(initialGrid),
+      puzzle: clonePuzzle(initialPuzzle),
       moves: 0,
       isWon: false,
       isDeadlocked: false,
       lives: 3,
       isGameOver: false,
-      selectedGroupId: null,
+      selectedSegId: null,
       history: [],
-      hintGroupIds: [],
+      hintSegIds: [],
+      fullyRemovedSegIds: new Set<string>(),
     });
   },
 
-  // ── Next level ────────────────────────────────────────────────────────────
+  // ── Next level ──────────────────────────────────────────────────────────
   nextLevel: () => {
-    const { grid, loadLevel } = get();
-    if (!grid) return;
-    loadLevel(grid.levelNumber + 1);
+    const { puzzle, loadLevel } = get();
+    if (!puzzle) return;
+    loadLevel(puzzle.levelNumber + 1);
   },
 }));

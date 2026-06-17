@@ -1,59 +1,50 @@
-// Light theme colors (matching the original game's visual style)
 export const COLORS = {
-  // Backgrounds
-  bgGradientStart: '#EDF3FA',
-  bgGradientEnd:   '#EDF3FA',
+  bgGradientStart: '#FFFFFF',
+  bgGradientEnd:   '#FFFFFF',
 
-  // Card (arrow cell)
-  cardBg:          '#FFFFFF',
-  cardBgEscapable: '#FFFFFF',
-  cardBgHint:      '#EDFAF3',
+  cardBg:          'transparent',
+  cardBgEscapable: 'transparent',
+  cardBgHint:      'transparent',
   cardBgRemoved:   'transparent',
 
-  // Arrow icons
-  arrowNormal:     '#1F355E', // dark navy
-  arrowEscapable:  '#1F355E',
-  arrowHint:       '#22C55E',
-  arrowHighlight:  '#3B82F6', // blue highlight
+  arrowNormal:     '#1A1A2E',
+  arrowEscapable:  '#1A1A2E',
+  arrowHint:       '#CC0000',
+  arrowHighlight:  '#CC0000',
 
-  // Borders
   borderEscapable: 'transparent',
-  borderHint:      '#22C55E',
+  borderHint:      'transparent',
 
-  // Empty dot
-  dot:             '#C4CBD5',
+  dot:             '#DDDDDD',
 
-  // Badge/Pill Background & Text
-  badgeBg:         '#E9EEF5',
+  badgeBg:         '#F0F0F0',
   badgeText:       '#17243A',
 
-  // UI
   surface:         '#FFFFFF',
-  text:            '#1F355E',
+  text:            '#1A1A2E',
   textSecondary:   '#64748B',
-  accent:          '#1F355E',
+  accent:          '#1A1A2E',
   danger:          '#EF4444',
   success:         '#22C55E',
   warning:         '#F59E0B',
 
-  // Bottom bar
   bottomBar:       '#FFFFFF',
   bottomBarShadow: '#00000010',
 };
 
 export const SHADOWS = {
   card: {
-    shadowColor: '#1A2340',
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowColor:   'transparent',
+    shadowOpacity: 0,
+    shadowRadius:  0,
+    shadowOffset:  { width: 0, height: 0 },
+    elevation:     0,
   },
   surface: {
-    shadowColor: '#1A2340',
+    shadowColor:   '#1A2340',
     shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    shadowRadius:  12,
+    shadowOffset:  { width: 0, height: 4 },
+    elevation:     6,
   },
 };

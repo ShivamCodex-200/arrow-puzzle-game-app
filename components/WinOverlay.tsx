@@ -96,7 +96,7 @@ const Particle = ({ index }: { index: number }) => {
 
 // ── Win Overlay ───────────────────────────────────────────────────────────
 export const WinOverlay: React.FC = () => {
-  const { grid, moves, isWon, nextLevel, resetLevel } = useGameStore();
+  const { puzzle, moves, isWon, nextLevel, resetLevel } = useGameStore();
 
   const scale  = useSharedValue(0.6);
   const opCard = useSharedValue(0);
@@ -121,9 +121,9 @@ export const WinOverlay: React.FC = () => {
     transform: [{ scale: scale.value }],
   }));
 
-  if (!isWon || !grid) return null;
+  if (!isWon || !puzzle) return null;
 
-  const total = grid.totalGroups;
+  const total = puzzle.totalSegments;
   const stars = moves <= total ? 3 : moves <= Math.floor(total * 1.5) ? 2 : 1;
 
   const handleNext = () => {
@@ -148,7 +148,7 @@ export const WinOverlay: React.FC = () => {
             <MaterialIcons name="emoji-events" size={52} color="#F59E0B" />
           </View>
 
-          <Text className="text-[26px] font-black text-game-navy tracking-tight">Level {grid.levelNumber} Clear!</Text>
+          <Text className="text-[26px] font-black text-game-navy tracking-tight">Level {puzzle.levelNumber} Clear!</Text>
           <Text className="text-[14px] text-game-secondary font-medium">Well played! 🎉</Text>
 
           {/* Stars */}

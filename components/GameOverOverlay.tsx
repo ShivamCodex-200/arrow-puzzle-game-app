@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 
 export const GameOverOverlay: React.FC = () => {
   const router = useRouter();
-  const { grid, isGameOver, resetLevel } = useGameStore();
+  const { puzzle, isGameOver, resetLevel } = useGameStore();
 
   const scale  = useSharedValue(0.6);
   const opCard = useSharedValue(0);
@@ -39,7 +39,7 @@ export const GameOverOverlay: React.FC = () => {
     transform: [{ scale: scale.value }],
   }));
 
-  if (!isGameOver || !grid) return null;
+  if (!isGameOver || !puzzle) return null;
 
   const handleRetry = () => {
     resetLevel();

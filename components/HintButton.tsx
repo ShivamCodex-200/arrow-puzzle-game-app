@@ -42,11 +42,11 @@ const RulerIcon = () => (
 );
 
 export const HintButton: React.FC = () => {
-  const { hints, useHint, isWon, isDeadlocked, grid, undoMove, history } = useGameStore();
+  const { hints, useHint, isWon, isDeadlocked, puzzle, undoMove, history } = useGameStore();
   const { haptics } = useSettingsStore();
 
   const handleHint = () => {
-    if (hints <= 0 || isWon || !grid) return;
+    if (hints <= 0 || isWon || !puzzle) return;
     if (haptics) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     useHint();
   };

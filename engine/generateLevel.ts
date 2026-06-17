@@ -1,26 +1,13 @@
 /**
  * engine/generateLevel.ts
  *
- * Builds levels by REVERSE-PLACEMENT construction instead of
- * "random directions + hope it's solvable".
- *
- * Why the old version was broken:
- *   1. It assigned a random direction to every cell, then ran a forward
- *      solvability check. A randomly-filled board almost never has a valid
- *      full removal order, so isSolvable() failed for all 50 attempts and
- *      every level silently fell back to an UNSOLVABLE board.
- *   2. Random per-cell directions meant ~80% of groups were size-1, so the
- *      board looked like a field of scattered single arrows, not shapes.
- *
- * How this version works (guaranteed solvable by construction):
- *   We place groups one at a time. Each group's HEAD cell must have a clear
- *   ray to the board edge considering only the cells already placed.
- *   If every placed group satisfies that, then removing them in REVERSE
- *   placement order is a valid solution. No guessing, no fallback needed.
- *   We also grow each group toward a target length so arrows form real shapes.
+ * Generates Arrow Puzzle levels that look like the real game.
+ * Key: groups must be LONG (3-12 cells) and fill the board densely.
+ * The maze visual comes from long same-direction groups packed together.
  */
-import { getShapeMask } from "./shapeMasks";
-import type { Cell, Direction, GridState, Group } from "./types";
+
+import { getShapeMask } from './shapeMasks';
+import type { Cell, Direction, GridState, Group } from './types';
 
 // ── Seeded RNG (Mulberry32) ──────────────────────────────────────────────
 function mulberry32(seed: number): () => number {
@@ -42,56 +29,50 @@ function shuffle<T>(arr: T[], rand: () => number): T[] {
   return a;
 }
 
-// ── Direction table ───────────────────────────────────────────────────────
 const DIRS: { dir: Direction; dx: number; dy: number }[] = [
-  { dir: "right", dx: 1, dy: 0 },
-  { dir: "left", dx: -1, dy: 0 },
-  { dir: "down", dx: 0, dy: 1 },
-  { dir: "up", dx: 0, dy: -1 },
+  { dir: 'right', dx: 1,  dy: 0  },
+  { dir: 'left',  dx: -1, dy: 0  },
+  { dir: 'down',  dx: 0,  dy: 1  },
+  { dir: 'up',    dx: 0,  dy: -1 },
 ];
 
-// ── Grid sizing / difficulty (kept identical so nothing else breaks) ──────
 export function getGridSize(level: number): { rows: number; cols: number } {
-  if (level <= 5) return { rows: 8, cols: 6 };
-  if (level <= 15) return { rows: 10, cols: 8 };
+  if (level <= 5)  return { rows: 8,  cols: 6  };
+  if (level <= 15) return { rows: 10, cols: 8  };
   if (level <= 30) return { rows: 12, cols: 10 };
   if (level <= 60) return { rows: 14, cols: 12 };
-  return { rows: 16, cols: 14 };
+  return                  { rows: 16, cols: 14 };
 }
 
 export function getDifficulty(level: number): string {
-  if (level <= 5) return "Easy";
-  if (level <= 15) return "Normal";
-  if (level <= 30) return "Hard";
-  if (level <= 60) return "Expert";
-  return "Master";
+  if (level <= 5)  return 'Easy';
+  if (level <= 15) return 'Normal';
+  if (level <= 30) return 'Hard';
+  if (level <= 60) return 'Expert';
+  return 'Master';
 }
 
-// ── MAIN GENERATOR ────────────────────────────────────────────────────────
 export function generateLevel(levelNumber: number): GridState {
-  const lvl = Math.max(1, Math.floor(levelNumber));
+  const lvl  = Math.max(1, Math.floor(levelNumber));
   const seed = (lvl * 2654435761 + 1013904223) >>> 0;
   const rand = mulberry32(seed);
 
   const { rows, cols } = getGridSize(lvl);
-  const shapeMask = getShapeMask(lvl, rows, cols);
+  const shapeMask      = getShapeMask(lvl, rows, cols);
 
-  // occupied[r][c]: 1 once a cell is assigned to a group
-  const occupied: Uint8Array[] = [];
-  for (let r = 0; r < rows; r++) occupied.push(new Uint8Array(cols));
+  const occupied = Array.from({ length: rows }, () => new Uint8Array(cols));
 
-  const inBounds = (c: number, r: number) =>
-    c >= 0 && c < cols && r >= 0 && r < rows;
-  const isActive = (c: number, r: number) =>
-    inBounds(c, r) && shapeMask[r][c];
-  const isFree = (c: number, r: number) =>
-    isActive(c, r) && occupied[r][c] === 0;
+  const inBounds = (c: number, r: number) => c >= 0 && c < cols && r >= 0 && r < rows;
+  const isActive = (c: number, r: number) => inBounds(c, r) && shapeMask[r][c];
+  const isFree   = (c: number, r: number) => isActive(c, r) && occupied[r][c] === 0;
 
-  // Is the ray from (c,r) in (dx,dy) clear of placed (occupied) active cells
-  // all the way to the board edge? Inactive mask cells are gaps the arrow flies over.
-  const rayClear = (c: number, r: number, dx: number, dy: number): boolean => {
-    let cx = c + dx;
-    let cy = r + dy;
+  /**
+   * After placing the head cell at (hc, hr) going direction (dx, dy),
+   * verify no active occupied cell blocks the escape ray.
+   */
+  const headRayClear = (hc: number, hr: number, dx: number, dy: number): boolean => {
+    let cx = hc + dx;
+    let cy = hr + dy;
     while (inBounds(cx, cy)) {
       if (isActive(cx, cy) && occupied[cy][cx] === 1) return false;
       cx += dx;
@@ -100,104 +81,109 @@ export function generateLevel(levelNumber: number): GridState {
     return true;
   };
 
-  const cells: Record<string, Cell> = {};
+  /**
+   * Try to place a group of length [minLen, maxLen] starting from (startC, startR)
+   * in direction d. Returns the segment if successful, null otherwise.
+   */
+  const tryPlaceGroup = (
+    startC: number,
+    startR: number,
+    d: typeof DIRS[0],
+    minLen: number,
+    maxLen: number
+  ): [number, number][] | null => {
+    // Max contiguous free cells forward in direction d
+    let fwdC = startC, fwdR = startR;
+    while (isFree(fwdC + d.dx, fwdR + d.dy)) { fwdC += d.dx; fwdR += d.dy; }
+
+    // Max contiguous free cells backward (to allow tail to extend back)
+    let bkC = startC, bkR = startR;
+    while (isFree(bkC - d.dx, bkR - d.dy)) { bkC -= d.dx; bkR -= d.dy; }
+
+    // Collect the full free segment
+    const seg: [number, number][] = [];
+    let px = bkC, py = bkR;
+    while (true) {
+      if (isFree(px, py)) seg.push([px, py]);
+      if (px === fwdC && py === fwdR) break;
+      px += d.dx; py += d.dy;
+      if (!inBounds(px, py)) break;
+    }
+
+    if (seg.length === 0) return null;
+
+    const tryMax = Math.min(seg.length, maxLen);
+    const startIdx = seg.findIndex(([c, r]) => c === startC && r === startR);
+
+    // Try from longest to minLen
+    for (let len = tryMax; len >= minLen; len--) {
+      const siMin = Math.max(0, startIdx - len + 1);
+      const siMax = Math.min(seg.length - len, startIdx);
+
+      for (let si = siMin; si <= siMax; si++) {
+        const candidate = seg.slice(si, si + len);
+        if (candidate.length !== len) continue;
+        if (!candidate.every(([c, r]) => isFree(c, r))) continue;
+
+        const [headC, headR] = candidate[candidate.length - 1];
+        if (headRayClear(headC, headR, d.dx, d.dy)) {
+          return candidate;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const cells:  Record<string, Cell>  = {};
   const groups: Record<string, Group> = {};
   let groupCounter = 0;
 
-  // Target group length grows with difficulty → bigger, clearer shapes.
-  const targetLength =
-    lvl <= 5 ? 3 : lvl <= 15 ? 4 : lvl <= 30 ? 5 : lvl <= 60 ? 6 : 7;
+  // Longer groups = more like real game maze
+  const minLen = lvl <= 5 ? 3 : lvl <= 15 ? 4 : 5;
+  const maxLen = lvl <= 5 ? 6 : lvl <= 15 ? 8 : lvl <= 30 ? 10 : 12;
 
+  // Process row-major with shuffled directions per cell
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (!isFree(c, r)) continue;
 
-      let best: { dir: Direction; seg: [number, number][] } | null = null;
+      const dirOrder = shuffle(DIRS, rand);
+      let placed = false;
 
-      for (const d of shuffle(DIRS, rand)) {
-        // Farthest free cell we could reach from (c,r) moving in +dir.
-        let maxC = c;
-        let maxR = r;
-        while (isFree(maxC + d.dx, maxR + d.dy)) {
-          maxC += d.dx;
-          maxR += d.dy;
+      // Try to place a long group (>= minLen)
+      for (const d of dirOrder) {
+        const seg = tryPlaceGroup(c, r, d, minLen, maxLen);
+        if (!seg || seg.length === 0) continue;
+
+        const gid     = `G${lvl}-${groupCounter++}`;
+        const cellIds = seg.map(([gc, gr]) => `${gc}-${gr}`);
+
+        groups[gid] = { id: gid, direction: d.dir, cellIds, isRemoved: false, isRemoving: false };
+
+        for (const [gc, gr] of seg) {
+          const id = `${gc}-${gr}`;
+          cells[id] = { id, col: gc, row: gr, direction: d.dir, groupId: gid, isRemoved: false };
+          occupied[gr][gc] = 1;
         }
 
-        // Pick the farthest valid HEAD (free cell whose beyond-ray is clear).
-        let foundHead: { hc: number; hr: number } | null = null;
-        let sx = c;
-        let sy = r;
-        while (true) {
-          if (
-            isActive(sx, sy) &&
-            occupied[sy][sx] === 0 &&
-            rayClear(sx + d.dx, sy + d.dy, d.dx, d.dy)
-          ) {
-            foundHead = { hc: sx, hr: sy };
-          }
-          if (sx === maxC && sy === maxR) break;
-          sx += d.dx;
-          sy += d.dy;
-          if (!isActive(sx, sy)) break;
-        }
-        if (!foundHead) continue;
-
-        // Extend the TAIL backward (opposite dir) over free cells.
-        let tc = c;
-        let tr = r;
-        while (isFree(tc - d.dx, tr - d.dy)) {
-          tc -= d.dx;
-          tr -= d.dy;
-        }
-
-        // Build the segment tail→head (all free & active by construction).
-        const seg: [number, number][] = [];
-        let px = tc;
-        let py = tr;
-        while (true) {
-          seg.push([px, py]);
-          if (px === foundHead.hc && py === foundHead.hr) break;
-          px += d.dx;
-          py += d.dy;
-        }
-
-        if (!best || seg.length > best.seg.length) best = { dir: d.dir, seg };
-        if (best.seg.length >= targetLength) break; // good enough, add variety
+        placed = true;
+        break;
       }
 
-      if (!best) {
-        // Fallback: singleton pointing toward any clear edge.
-        for (const d of shuffle(DIRS, rand)) {
-          if (rayClear(c + d.dx, r + d.dy, d.dx, d.dy)) {
-            best = { dir: d.dir, seg: [[c, r]] };
+      // Fallback: place a single-cell group so board stays fully covered
+      if (!placed) {
+        const dirOrder2 = shuffle(DIRS, rand);
+        for (const d of dirOrder2) {
+          if (headRayClear(c, r, d.dx, d.dy)) {
+            const gid = `G${lvl}-${groupCounter++}`;
+            const id  = `${c}-${r}`;
+            groups[gid] = { id: gid, direction: d.dir, cellIds: [id], isRemoved: false, isRemoving: false };
+            cells[id]   = { id, col: c, row: r, direction: d.dir, groupId: gid, isRemoved: false };
+            occupied[r][c] = 1;
             break;
           }
         }
-      }
-      if (!best) continue; // extremely rare; cell stays empty
-
-      const gid = `G${lvl}-${groupCounter++}`;
-      // cellIds: [0] = tail (innermost), [last] = head (leading edge)
-      const cellIds = best.seg.map(([cc, rr]) => `${cc}-${rr}`);
-
-      groups[gid] = {
-        id: gid,
-        direction: best.dir,
-        cellIds,
-        isRemoved: false,
-        isRemoving: false,
-      };
-      for (const id of cellIds) {
-        const [cc, rr] = id.split("-").map(Number);
-        cells[id] = {
-          id,
-          col: cc,
-          row: rr,
-          direction: best.dir,
-          groupId: gid,
-          isRemoved: false,
-        };
-        occupied[rr][cc] = 1;
       }
     }
   }
@@ -209,9 +195,9 @@ export function generateLevel(levelNumber: number): GridState {
     groups,
     shapeMask,
     levelNumber: lvl,
-    totalGroups: Object.keys(groups).length,
+    totalGroups:   Object.keys(groups).length,
     removedGroups: 0,
     seed,
-    difficulty: getDifficulty(lvl),
+    difficulty:    getDifficulty(lvl),
   };
 }

@@ -27,7 +27,7 @@ import { useGameStore } from "../../store/useGameStore";
 
 export default function PlayScreen() {
   const params = useLocalSearchParams<{ level?: string }>();
-  const { loadLevel, grid } = useGameStore();
+  const { loadLevel, puzzle } = useGameStore();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -124,7 +124,7 @@ export default function PlayScreen() {
               Tap to retry
             </Text>
           </View>
-        ) : grid ? (
+        ) : puzzle ? (
           // Game screen
           <>
             <GameHeader />

@@ -32,15 +32,15 @@ const SettingsGear = () => (
 
 export const GameHeader: React.FC = () => {
   const router = useRouter();
-  const { grid, moves, lives } = useGameStore();
+  const { puzzle, moves, lives } = useGameStore();
 
-  if (!grid) return null;
+  if (!puzzle) return null;
 
-  const level = grid.levelNumber;
-  const diff = grid.difficulty || getDifficulty(level);
+  const level = puzzle.levelNumber;
+  const diff = puzzle.difficulty || getDifficulty(level);
 
-  // Count active (unremoved) groups remaining
-  const remainingCount = Object.values(grid.groups).filter((g) => !g.isRemoved).length;
+  // Count active (unremoved) segments remaining
+  const remainingCount = puzzle.activeSegIds.size;
 
   return (
     <View className="px-4 pt-3 pb-2 z-10 bg-game-bg">

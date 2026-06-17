@@ -645,6 +645,8 @@ export default function DailyChallengeScreen() {
                           onShakeDone={() => handleShakeDone(cell.groupId)}
                           offsetX={gridOffsetX}
                           offsetY={gridOffsetY}
+                          boardWidth={CANVAS_SIZE}
+                          boardHeight={CANVAS_SIZE}
                         />
                       );
                     })}

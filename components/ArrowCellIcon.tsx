@@ -1,49 +1,89 @@
 /**
- * components/ArrowCellIcon.tsx
- *
- * Pure SVG arrow icon, centered, clean thin-stroke style.
+ * ArrowCellIcon.tsx
+ * 
+ * Draws the arrow exactly like the real game:
+ * - A line (stem) going in the direction
+ * - An arrowhead at the leading end
+ * - NO background, NO box, just strokes
  */
 
 import React from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Line, Polyline } from 'react-native-svg';
 import type { Direction } from '../engine/types';
 
-interface ArrowCellIconProps {
+interface Props {
   direction: Direction;
-  size: number;
+  size: number;       // cell size in px
   color: string;
+  strokeWidth?: number;
 }
 
-export const ArrowCellIcon: React.FC<ArrowCellIconProps> = ({
+export const ArrowCellIcon: React.FC<Props> = ({
   direction,
   size,
   color,
+  strokeWidth = 2.2,
 }) => {
-  // Arrow path pointing UP in a 24x24 viewport:
-  // Stem: (12, 19) to (12, 5). Head: (6, 11) -> (12, 5) -> (18, 11)
-  // Let's make it look like a sleek chevron-style or clean arrow.
-  const getRotation = () => {
-    switch (direction) {
-      case 'right': return '90deg';
-      case 'down': return '180deg';
-      case 'left': return '270deg';
-      case 'up':
-      default: return '0deg';
-    }
-  };
+  const s = size;
+  const pad = s * 0.18;         // padding from cell edge
+  const headSize = s * 0.22;    // arrowhead size
+
+  const cx = s / 2;
+  const cy = s / 2;
+
+  let stemX1: number, stemY1: number, stemX2: number, stemY2: number;
+  let headPoints: string;
+
+  switch (direction) {
+    case 'right':
+      stemX1 = pad;
+      stemY1 = cy;
+      stemX2 = s - pad;
+      stemY2 = cy;
+      headPoints = `${s - pad - headSize},${cy - headSize * 0.6} ${s - pad},${cy} ${s - pad - headSize},${cy + headSize * 0.6}`;
+      break;
+    case 'left':
+      stemX1 = s - pad;
+      stemY1 = cy;
+      stemX2 = pad;
+      stemY2 = cy;
+      headPoints = `${pad + headSize},${cy - headSize * 0.6} ${pad},${cy} ${pad + headSize},${cy + headSize * 0.6}`;
+      break;
+    case 'down':
+      stemX1 = cx;
+      stemY1 = pad;
+      stemX2 = cx;
+      stemY2 = s - pad;
+      headPoints = `${cx - headSize * 0.6},${s - pad - headSize} ${cx},${s - pad} ${cx + headSize * 0.6},${s - pad - headSize}`;
+      break;
+    case 'up':
+    default:
+      stemX1 = cx;
+      stemY1 = s - pad;
+      stemX2 = cx;
+      stemY2 = pad;
+      headPoints = `${cx - headSize * 0.6},${pad + headSize} ${cx},${pad} ${cx + headSize * 0.6},${pad + headSize}`;
+      break;
+  }
 
   return (
-    <Svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      style={{ transform: [{ rotate: getRotation() }] }}
-    >
-      <Path
-        d="M12 20V4M12 4L6 10M12 4L18 10"
+    <Svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
+      {/* Stem */}
+      <Line
+        x1={stemX1}
+        y1={stemY1}
+        x2={stemX2}
+        y2={stemY2}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+      {/* Arrowhead */}
+      <Polyline
+        points={headPoints}
         fill="none"
         stroke={color}
-        strokeWidth="2.5"
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
